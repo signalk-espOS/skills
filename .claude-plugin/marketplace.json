@@ -9,10 +9,38 @@
       "name": "espos-firmware",
       "source": "./espos-firmware",
       "description": "ESP32 firmware knowledge distilled from building espOS: diagnosing memory budgets (PSRAM that appears to do nothing, which pool TLS really uses), component checks that survive an ESP Component Registry install, and publishing firmware a browser-based flasher can fetch.",
-      "author": { "name": "Dirk Wahrheit" },
+      "author": {
+        "name": "Dirk Wahrheit"
+      },
       "repository": "https://github.com/signalk-espOS/skills",
       "license": "MIT",
-      "keywords": ["esp32", "esp-idf", "espos", "signalk", "firmware", "psram", "ota"]
+      "keywords": [
+        "esp32",
+        "esp-idf",
+        "espos",
+        "signalk",
+        "firmware",
+        "psram",
+        "ota"
+      ]
+    },
+    {
+      "name": "espos-dev",
+      "source": "./espos-dev",
+      "description": "Working on espOS and its child repos: which repo owns what and the contracts between them, building and releasing a firmware on espOS, and signing keys, OTA, the registry and fleet updates through signalk-espos-manager.",
+      "author": {
+        "name": "Dirk Wahrheit"
+      },
+      "repository": "https://github.com/signalk-espOS/skills",
+      "license": "MIT",
+      "keywords": [
+        "espos",
+        "signalk",
+        "esp-idf",
+        "ota",
+        "registry",
+        "firmware"
+      ]
     }
   ]
 }
