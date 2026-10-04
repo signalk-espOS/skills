@@ -19,9 +19,21 @@ October 2026. Sources: `espOS/docs/ota.md`, `espOS/docs/security.md`,
 | Checked by | `esp_ota_end` against the public key compiled into the **running** app | espOS httpd: `Authorization: Bearer <key>` or `espos_sid` cookie |
 | Lose / change it | Every fielded device refuses OTA → USB reflash | Re-key over the API |
 
-There is no fleet-wide *signing* key. Whoever builds a firmware owns its key; a third
+Whoever builds a firmware owns its signing key. One key may sign several projects:
+measured from the release images in October 2026, the cockpit and the BLE gateway share
+key `b3381b48b9cc9941`, while the third-party 8relay uses `c21a11df97bc7699`. A third
 party who wants their own build on their own boat generates their own key and accepts
 that devices flashed with it only take OTAs signed by it.
+
+Key fingerprint, the registry's `signingKeyId`: the first 16 hex characters of the
+Secure Boot V2 public-key digest. This is the same digest IDF's
+`esp_secure_boot_get_signature_blocks_for_running_app()` computes, and the same one that
+would be burned to eFuse. Read it from an image or a key with no device:
+
+```bash
+python -m espsecure signature-info-v2 build/<app>.bin    # "Public key digest for block 0: b3 38 1b …"
+python -m espsecure digest-sbv2-public-key --keyfile key.pem -o d.bin && od -An -tx1 d.bin | tr -d " \n" | head -c16
+```
 
 ## Signing keys in practice
 
@@ -88,7 +100,7 @@ nightly 04:17 UTC, on merge, on dispatch) resolves GitHub releases into the comm
 * PR adds **only** `projects/<id>.json`, titled `add: <id>`; `validate.yml` fails any PR
   that touches `index.json`.
 * `app` = CMake `project()` name from `GET /api/v1/system/ping` — the field people get
-  wrong. `boards[].reportedAs` = `hardware.board` from `/system/info`, matched exactly.
+  wrong. `boards[].reportedAs` = `hardware.board` from `/api/v1/system/info`, matched exactly.
 * `assets.ota` / `assets.merged`: anchored regexes with `(?<version>…)`; with two+ boards
   on one target also `(?<board>…)` and distinct `assetSegment`s.
 * `webAssetsBranch: "release-assets"` turns on CORS-readable `*WebUrl`s (the browser

@@ -50,7 +50,7 @@ prose and fix the prose when you touch it.
 | Contract | Sides | Spec |
 |---|---|---|
 | Device REST `/api/v1` (`system/ping`, `system/info`, `config`, `ota/*`) | espOS ↔ manager, designer (brightness via `PUT /api/v1/config {cockpit:{brightness}}`) | `espOS/docs/rest-api.md` (+ `ui/mock/server.mjs`) |
-| mDNS `_espos._tcp` TXT `id,v,app,espos,target,api,auth` | espOS ↔ manager | `espos_net`; the `auth` TXT is hard-coded 0 — use `GET /system/ping` |
+| mDNS `_espos._tcp` TXT `id,v,app,espos,target,api,auth` | espOS ↔ manager | `espos_net`; the `auth` TXT is hard-coded 0 — use `GET /api/v1/system/ping` |
 | OTA manifest `schema:1` `{app, builds[{version,target,channel,url,size,sha256,notes,date}]}`, ≤16 KiB | espos_ota ↔ manager mirror | `espOS/docs/ota.md`; manager `src/mirror/version.ts` is a byte-exact port of `espos_ota_version_cmp` (not semver) |
 | Registry entry + `index.json` | registry ↔ manager ↔ flasher | `registry/schema/project.schema.json` ("mirrors RegistryProject in the manager"); schema changes additive only, name the manager PR |
 | Release asset names | firmware workflows ↔ registry `assets.*` regexes | regexes need `(?<version>)`, `(?<board>)` when several boards share a target |
@@ -60,7 +60,7 @@ prose and fix the prose when you touch it.
 
 `app` in the registry is the firmware's CMake `project()` name as reported by
 `GET /api/v1/system/ping` — not the repo name, not `app_name`. `boards[].reportedAs` must
-equal `espos_start_opts_t.board` (`GET /system/info` → `hardware.board`) exactly; it
+equal `espos_start_opts_t.board` (`GET /api/v1/system/info` → `hardware.board`) exactly; it
 gates OTA.
 
 ## House rules (they differ — check the repo you are in)
