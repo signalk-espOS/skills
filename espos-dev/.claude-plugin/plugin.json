@@ -1,0 +1,8 @@
+{
+  "name": "espos-dev",
+  "description": "Working on espOS and its child repos: which repo owns what and the contracts between them, building and releasing a firmware on espOS, and signing keys, OTA, the registry and fleet updates through signalk-espos-manager.",
+  "version": "0.1.0",
+  "author": { "name": "Dirk Wahrheit" },
+  "license": "MIT",
+  "keywords": ["espos", "signalk", "esp-idf", "ota", "registry", "firmware"]
+}

@@ -9,11 +9,13 @@ Install:
 ```
 /plugin marketplace add signalk-espOS/skills
 /plugin install espos-firmware@signalk-espos
+/plugin install espos-dev@signalk-espos
 ```
 
-Nothing here is espOS-specific in the sense of requiring it. All three skills are
-about ESP-IDF, the ESP Component Registry and GitHub Actions, and apply to any ESP32
-firmware project.
+`espos-firmware` is not espOS-specific: its three skills are about ESP-IDF, the ESP
+Component Registry and GitHub Actions, and apply to any ESP32 firmware project.
+`espos-dev` is the opposite: how espOS and its child repos fit together, for anyone
+working on them.
 
 ## espos-firmware
 
@@ -44,6 +46,31 @@ with no CORS header, so a web page cannot fetch them at all; the fix is a mirror
 branch, and doing that safely on a shared branch means `--force-with-lease` with a
 retry. Includes the GitHub Actions concurrency behaviour that silently drops a release,
 and the rollback traps that can delete another release's firmware.
+
+## espos-dev
+
+Three sibling skills for working on espOS itself and the projects built on it.
+
+### espos-ecosystem
+
+Which repo owns what (espOS, registry, signalk-espos-manager, the cockpit and its WASM
+preview, the BLE gateway, the HMI designer, the stream plugin), the contracts between
+them that must change in lockstep, where a fix belongs, and the house rules that differ
+per repo. Load it first.
+
+### espos-firmware-project
+
+Building a firmware on espOS: the CMake prologue and optional components, sdkconfig
+layering, partition tables, the IDF version pin, the locked build wrapper, host tests,
+bumping the `espos` submodule without breaking `dependencies.lock`, and releasing through
+espOS's reusable workflows.
+
+### espos-keys-ota-fleet
+
+Signing keys (development, named, CI secret, deliberately unsigned) and why the wrong one
+strands OTA; the fleet key, which is an API key and not a signing key; the device OTA
+flow and manifest; listing a firmware in the registry; and how signalk-espos-manager
+takes a boat from first USB flash to staying current.
 
 ## Versions
 
