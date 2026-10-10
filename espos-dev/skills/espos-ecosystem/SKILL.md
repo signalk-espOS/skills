@@ -84,11 +84,31 @@ gates OTA.
 * No version bumps or release work unless the user says release; release-please owns
   `version.txt`.
 
+## SignalK plugin repos (manager, designer, stream)
+
+* Signal K does not apply the config schema's `default`s at runtime: `start()` gets `{}`
+  until the user saves the plugin config, so merge defaults (or parse the config) in
+  `start()` yourself.
+* The App Store installs plugins with `--ignore-scripts`; a dependency that needs an
+  install script does not work there.
+* The App Store score comes from the SignalK plugin registry's nightly scan. It runs the
+  declared plugin-ci `test-command` from a fresh clone of the default branch HEAD (not the
+  release tag), killed after 240 s, and counts the tests as failing if they do not finish.
+  It deducts 10 points when there is no green plugin-ci run on the npm `gitHead` commit,
+  and 5 each for no `signalk.screenshots` and no CHANGELOG or GitHub Release for the
+  version. To re-score sooner, open a "Request a plugin re-score" issue on
+  `SignalK/signalk-plugin-registry`.
+
 ## Cloud-session gotchas
 
 * Firmware checkouts arrive with the `espos/` submodule **uninitialised** (empty dir).
   `git submodule update --init --recursive` before building or grepping `espos/`; a sibling
   `../espOS` may exist but is not necessarily the pinned commit.
+* The Claude GitHub App is not installed on the `SignalK` org, so a cloud session cannot
+  open PRs, comment or call the API there. Read an upstream PR with
+  `git fetch <remote> refs/pull/<n>/head`; issue and PR comments render client-side, so
+  `curl https://r.jina.ai/https://github.com/SignalK/<repo>/issues/<n>` is the way to read
+  them as text.
 * No ESP-IDF toolchain is preinstalled; say so rather than claiming a build ran.
   Host-side checks that need no IDF: registry `node scripts/validate.mjs`, the Node
   repos' `npm test`, espOS `python3 -m unittest discover -s tools -p 'test_*.py'`.
