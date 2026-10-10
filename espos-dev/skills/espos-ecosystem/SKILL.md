@@ -92,11 +92,15 @@ gates OTA.
 * The App Store installs plugins with `--ignore-scripts`; a dependency that needs an
   install script does not work there.
 * The App Store score comes from the SignalK plugin registry's nightly scan. It runs the
-  declared plugin-ci `test-command` from a fresh clone of the default branch HEAD (not the
-  release tag), killed after 240 s, and counts the tests as failing if they do not finish.
-  It deducts 10 points when there is no green plugin-ci run on the npm `gitHead` commit,
-  and 5 each for no `signalk.screenshots` and no CHANGELOG or GitHub Release for the
-  version. To re-score sooner, open a "Request a plugin re-score" issue on
+  tests from the published npm package first (`npm test`, 60 s cap). Only if they do not
+  pass does it clone the default branch HEAD (not the release tag) and test there: the
+  declared plugin-ci `test-command` gets 240 s, a plain `npm test` 60 s. A suite that does
+  not finish in time counts as failing. It deducts 10 points when it finds no plugin-ci
+  run for the npm `gitHead` commit (no gitHead, no run, or runs that don't use the
+  reusable plugin-ci workflow); a finished run counts even if matrix jobs failed, which
+  the registry reports separately. It also deducts 5 each for no `signalk.screenshots`
+  and no CHANGELOG or GitHub Release for the version. To re-score sooner, open a
+  "Request a plugin re-score" issue on
   `SignalK/signalk-plugin-registry`.
 
 ## Cloud-session gotchas
