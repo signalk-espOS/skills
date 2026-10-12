@@ -1,11 +1,11 @@
 ---
 name: espos-firmware-project
-description: Build, configure, test and maintain an ESP-IDF firmware on espOS — the CMake prologue, sdkconfig layering, partition tables, the IDF version pin, the locked build wrapper, host tests, bumping the espos submodule and its dependencies.lock, and releasing through espOS's reusable workflows.
+description: Start, build, configure, test and maintain an ESP-IDF firmware on espOS — setting up a new firmware repo (CI, Docker Hub login, repo settings, Dependabot), the CMake prologue, sdkconfig layering, partition tables, the IDF version pin, the locked build wrapper, host tests, bumping the espos submodule and its dependencies.lock, and releasing through espOS's reusable workflows.
 ---
 
 # A firmware on espOS
 
-Verified against espOS v0.15.0 / ESP-IDF v6.0.3, October 2026. Primary sources in the
+Verified against espOS v0.18.0 / ESP-IDF v6.0.3, October 2026. Primary sources in the
 espOS tree: `docs/development.md`, `docs/releasing.md`, `cmake/espos_project.cmake`,
 `cmake/espos_version.cmake`, `scripts/build.sh`.
 
@@ -21,8 +21,14 @@ espos_project_prologue(NAME "my-firmware"
                        PARTITIONS "${ESPOS_PARTITIONS_DIR}/16mb.csv"
                        COMPONENTS espos_ble espos_eth)              # optional components
 project(my_firmware)          # this name is the registry "app" and the OTA project check
-espos_project_ui_partition()  # after project(), always — packs the web UI into storage.bin
+espos_project_ui_partition()  # after project(), always — see below
 ```
+
+`espos_project_ui_partition()` is defined by `espos_httpd` (its `project_include.cmake`),
+so registry builds have it too. The default bundle is embedded in the app image
+(`CONFIG_ESPOS_HTTPD_UI_EMBED`) and also packed into `storage`; OTA never rewrites
+`storage`, so a device first flashed before espOS #202 (the embedded UI) keeps its old
+page until it takes a release that includes #202.
 
 Prologue arguments: `NAME`, `PARTITIONS` (default 4 MB table), `COMPONENTS`,
 `SIGNING_KEY`, `PROFILE` (`release`|`debug`, `-DESPOS_PROFILE=` wins),
@@ -103,6 +109,76 @@ on the machine, `nice`/`ionice`, half the cores (`BUILD_JOBS`), one job under 3 
   the committed `components/espos_httpd/ui-dist/`, and CI fails on a stale bundle.
   `docs/rest-api.md` and `ui/mock/server.mjs` change together.
 
+## Setting up a new firmware repo
+
+Start from **dirkwa/espos-ble-gateway**, the most up to date consumer. Copy its
+`.github/workflows/` (`ci.yml`, `pr-title.yml`, `release-please.yml`,
+`release-firmware.yml`, `track-espos.yml`) plus `release-please-config.json` and
+`.release-please-manifest.json`, then rename. Copy the current files rather than writing
+them from scratch or from memory.
+
+**CI shape** (`ci.yml`): one matrix leg per target, `submodules: recursive`,
+`fetch-depth: 0` (the version comes from `git describe`), the IDF version read from
+`.idf-version`, the build through `espressif/esp-idf-ci-action` pinned by SHA. Third-party
+actions are pinned by full commit SHA with the tag in a comment.
+
+**Docker Hub login, in every job that runs the espressif/idf container.** Docker Hub
+rate-limits anonymous pulls per runner IP, and shared runners hit it ("toomanyrequests").
+Put this step before each `esp-idf-ci-action` use:
+
+```yaml
+- name: log in to Docker Hub
+  if: vars.DOCKERHUB_USERNAME != ''
+  continue-on-error: true      # forks and a revoked token pull anonymously, not fail
+  uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+  with:
+    username: ${{ vars.DOCKERHUB_USERNAME }}
+    password: ${{ secrets.DOCKERHUB_TOKEN }}
+```
+
+* `DOCKERHUB_USERNAME` is an Actions **variable** holding the **Docker ID** (the name at
+  the top of hub.docker.com), not the account email.
+* `DOCKERHUB_TOKEN` is an Actions **secret**. Never a variable: variables are plain text
+  on the settings page and unmasked in logs. A token found stored as a variable is
+  exposed; rotate it. A step's `if:` cannot test a secret, which is why it tests the
+  variable.
+* The token is a Docker Hub personal access token with **Public Repo Read-only** access
+  (Account settings, Personal access tokens). One token can serve every repo. Docker Hub
+  shows it once; generate a new one rather than hunting for an old one.
+* A login in the caller does not reach a reusable workflow's jobs: espOS's
+  `build-firmware.yml` (which the gateway's release calls) has no login step today, so
+  those release builds still pull anonymously.
+* v3 of the action prints a `punycode` DeprecationWarning; v4 does not. The warning
+  is harmless; an empty password shows as `Password required` and only means the
+  secret is missing.
+
+**Repo settings before the first release:**
+* Actions, General: "Allow GitHub Actions to create and approve pull requests" (else
+  release-please fails with zero jobs, and track-espos cannot open its PR).
+* The signing key secret (`<PROJECT>_SIGNING_KEY_PEM`), see `espos-keys-ota-fleet`.
+* `.github/dependabot.yml` for `github-actions`, weekly, `commit-message.prefix: ci`,
+  one group. Without it SHA pins go stale unnoticed.
+  Dependabot PRs get no Actions secrets, so their Docker Hub login falls back to
+  anonymous; that is what `continue-on-error` is for.
+
+**Scripts:** build with `espos/scripts/build.sh` (or a `scripts/build.sh` shim to it, as
+the cockpit has), never bare `idf.py build`. `espos/scripts/regen_lock.sh` and the other
+`espos/scripts/check_*` scripts serve espOS's own tree, not a consumer's: a consumer
+regenerates its lock with `idf.py reconfigure` (below).
+
+**A target that needs a newer espOS than the pin** gets a configure-time guard after
+`project()`, so CI and the release refuse the build rather than ship a broken image:
+
+```cmake
+idf_build_get_property(_target IDF_TARGET)
+file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/espos/version.txt" _espos_version LIMIT_COUNT 1)
+if(_target STREQUAL "esp32c5" AND _espos_version VERSION_LESS "0.18.0")
+    message(FATAL_ERROR "my-fw on esp32c5 needs espOS >= 0.18.0; espos is at ${_espos_version}")
+endif()
+```
+
+That target's CI leg is red until the bump lands; that is the guard working.
+
 ## Bumping espOS in a firmware
 
 ```bash
@@ -113,8 +189,11 @@ git commit -am "chore: bump espos to vX.Y.Z"   # "chore!:" when espOS broke API
 
 * Cockpit commits `dependencies.lock`; the gateway git-ignores it. Use `reconfigure`,
   **not** `update-dependencies`, so unrelated components do not ride along.
-* Cockpit's `track-espos.yml` does this daily from espOS `releases/latest` and dispatches a
-  signed firmware build on the branch. If the lock solve fails it still opens a PR titled
+* Cockpit's and the gateway's `track-espos.yml` do this daily from espOS
+  `releases/latest` (the gateway's PR is titled `fix: bump espOS to vX.Y.Z`); the
+  cockpit's also dispatches a signed firmware build on the branch. Let that PR carry a
+  bump rather than pushing the same submodule move into a feature PR. If the cockpit's
+  lock solve fails it still opens a PR titled
   "…dependencies.lock not regenerated": merge main into the branch, `idf.py reconfigure`,
   commit the lock, **retitle**, then merge.
 * Copy `.idf-version` from espOS when it changes.
