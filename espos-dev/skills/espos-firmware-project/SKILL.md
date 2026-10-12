@@ -26,7 +26,8 @@ never a branch tip), copy `espos/.idf-version` to the repo root, and build only 
 | "Allow GitHub Actions to create and approve pull requests" | Settings → Actions → General | release-please and the espOS bump workflow open PRs; without it they fail with zero jobs |
 | signing key, e.g. `<NAME>_SIGNING_KEY_PEM` | **Secret** | release builds refuse to run without it; see `espos-keys-ota-fleet` |
 | `RELEASE_APP_ID`, `RELEASE_APP_PRIVATE_KEY` | **Secrets** | the org's release App token: its pushes and PRs start CI (the workflow token's do not) and it may send the registry's `firmware-released` dispatch |
-| `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` | **Secrets**, both | CI pulls the `espressif/idf` image; logged in, Docker Hub rate-limits per account instead of per shared runner IP |
+| `DOCKERHUB_USERNAME` | **Variable**, the Docker ID | CI pulls the `espressif/idf` image; logged in, Docker Hub rate-limits per account instead of per shared runner IP. The step's `if:` tests it, since an `if:` cannot read a secret |
+| `DOCKERHUB_TOKEN` | **Secret** | the read-only access token for that account |
 
 The Docker Hub pair goes wrong in three quiet ways, all seen on a real repo:
 
@@ -39,31 +40,27 @@ The Docker Hub pair goes wrong in three quiet ways, all seen on a real repo:
 * **A personal password instead of a token.** Create one at hub.docker.com → Account
   settings → Personal access tokens, scope **Public Repo Read-only** — CI only pulls.
 
-The login step, in every job that runs `espressif/esp-idf-ci-action` (a step's `if:`
-cannot read secrets, so the job exposes whether they are set):
+The login step, before every `espressif/esp-idf-ci-action` use, exactly as the gateway
+and cockpit run it:
 
 ```yaml
-jobs:
-  firmware:
-    runs-on: ubuntu-latest
-    env:
-      DOCKERHUB_LOGIN: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
-    steps:
-      # ...checkout with submodules: recursive and fetch-depth: 0...
-      - name: log in to Docker Hub
-        if: env.DOCKERHUB_LOGIN == 'true'
-        continue-on-error: true   # a failed login falls back to an anonymous pull
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: espressif/esp-idf-ci-action@v1
+- name: log in to Docker Hub
+  if: vars.DOCKERHUB_USERNAME != ''
+  continue-on-error: true   # a failed login falls back to an anonymous pull
+  uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+  with:
+    username: ${{ vars.DOCKERHUB_USERNAME }}
+    password: ${{ secrets.DOCKERHUB_TOKEN }}
 ```
 
-Forks and runs without the secrets skip the login and still build. Pin actions by
-commit SHA and add a Dependabot entry for them, or pins rot unnoticed —
-`docker/login-action` v3 printed a `punycode` deprecation warning on every run for
-months before anyone looked:
+Without the variable the step is skipped; forks and Dependabot PRs (which get no Actions
+secrets) fail the login and still build. A login in a caller does not reach a reusable
+workflow's jobs: espOS's `build-firmware.yml` has no login step yet, so release builds
+through it pull anonymously.
+
+Pin actions by commit SHA and add a Dependabot entry for them, or pins go stale
+unnoticed (the gateway's `docker/login-action` v3 printed a `punycode` deprecation
+warning on every run until it was bumped by hand):
 
 ```yaml
 # .github/dependabot.yml
