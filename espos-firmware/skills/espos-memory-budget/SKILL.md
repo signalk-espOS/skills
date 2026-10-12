@@ -58,8 +58,9 @@ move" a statement you can defend instead of a suspicion.
 `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` defaults to **16384**, so every allocation
 smaller than 16 KB stays internal — and most allocations are smaller than that. A
 board can report `Found 8MB PSRAM device`, add it to the heap, and still exhaust
-internal RAM with 8.2 MB idle. Lower it (1024 is a reasonable starting point) or
-nothing moves.
+internal RAM with 8.2 MB idle. Lower it or nothing moves; the C5 BLE gateway runs at
+256, with `CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768` kept for allocations that ask
+for internal or DMA memory.
 
 **2. `CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y` can stop WiFi working entirely.**
 It is the option that moves the largest single block — tens of KB of WiFi and lwIP
@@ -68,14 +69,25 @@ buffers — out of internal RAM, and on some parts the station then never associ
 i.e. your own state machine giving up), repeating indefinitely. Measured, repeatably,
 on an ESP32-C5. The likeliest reason is that the driver needs those buffers in
 internal memory, but that part is inference — treat the option as one to test on your
-own silicon rather than as a general fact about PSRAM and DMA.
+own silicon rather than as a general fact about PSRAM and DMA. **Rule out the radio
+first:** on a shared WiFi/BLE radio, a BLE scan at a 50 % duty cycle (160 ms every
+320 ms) produced exactly the same reason 36 with this option *off*, and the station
+joined within seconds once scanning paused. Pause the scan until the station has an
+address before blaming PSRAM.
 
-**3. Task stacks do not go to PSRAM by default, and mostly cannot.**
-`xTaskCreate()` allocates internally. IDF 6 has
-`CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM`, but it applies only to a stack passed to
-`xTaskCreateStatic()` and only where the stack is never touched while the cache is
-disabled — which is not how most drivers or application code create tasks. Treat it
-as a porting exercise, not a setting.
+**3. Task stacks do not go to PSRAM by default — but your own can.**
+`xTaskCreate()` allocates internally. With `CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM`
+(default y with SPIRAM on IDF 6, except on the original ESP32), `xTaskCreateWithCaps(..., MALLOC_CAP_SPIRAM |
+MALLOC_CAP_8BIT)` puts a task's stack in PSRAM, and `vTaskDeleteWithCaps(NULL)` lets
+it delete itself. The rule: **the task must never run while the cache is off**, and
+any flash access switches it off — NVS *reads* as well as writes, OTA, partition
+reads. Audit every call path, including library ones: the espOS BLE gateway task
+looked flash-free until an HTTPS POST turned out to load and save a TLS pin in NVS on
+the caller's task; the fix hands those NVS calls to a short-lived task with an
+internal stack when the caller's is in PSRAM (`esp_ptr_external_ram(&local)`).
+Moved this way on the C5: the gateway task (8 KB) and mDNS (`CONFIG_MDNS_TASK_CREATE_FROM_SPIRAM`).
+Not movable: anything that writes NVS (SignalK client, httpd, Bluedroid), OTA, WiFi/lwIP,
+and tasks that run arbitrary callbacks (event loop, timer service).
 
 **4. `CONFIG_SPIRAM` is *not* a bootloader change** (at least on the C5).
 `esp_psram_init()` is called from `esp_system/port/cpu_start.c` under
@@ -85,7 +97,21 @@ PSRAM ships by OTA like any other build, and does not require a USB flash per de
 Verify on your target before relying on it: some parts do map PSRAM earlier.
 
 Also worth knowing: on ESP32-C5 rev v1.0 IDF warns that PSRAM contents are not
-encrypted. Keep TLS buffers in internal memory there.
+encrypted, even with flash encryption on, and names TLS buffers as an example. The
+espOS C5 gateway puts them there anyway (`CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC`: the PSRAM
+is in-package, so reading it takes a decapped chip) — make that call deliberately for
+a release build, and make any TLS memory pre-flight measure the pool mbedTLS actually
+allocates from.
+
+**On a part where code and data share one SRAM (the C5), IRAM is heap.** IDF puts
+WiFi speed code in IRAM by default (`CONFIG_ESP_WIFI_IRAM_OPT`, `_RX_IRAM_OPT`,
+`_EXTRA_IRAM_OPT`, `_SLP_IRAM_OPT`). Turning the four off — in the same change as
+moving ~7 KB of the gateway's static buffers to PSRAM — took a BLE gateway from 34.7
+to 66.3 KB of free internal RAM, low-water 15.8 → 25.5 KB; IDF's Kconfig help puts the
+four at roughly 39 KB of IRAM. The cost is WiFi throughput a few KB every two seconds
+never needs. Likewise the WiFi driver's static
+RX buffers must be internal, but 6 (= `CONFIG_ESP_WIFI_RX_BA_WIN`) instead of 10 frees
+6.4 KB.
 
 ## Which pool does TLS use?
 
@@ -140,6 +166,15 @@ Three cautions that cost real time:
   wrong chip — and a device will reject that image *after* a full OTA download.
 
 ## When the answer is "it does not fit"
+
+First check that it is: the ESP32-C5 was declared unable to run BLE + WiFi + a SignalK
+client ("no configuration changes that"), and it ran — internal RAM 66 KB free — once
+the levers above were pulled in order: PSRAM on with `ALWAYSINTERNAL` lowered, the
+Bluedroid host heap to PSRAM (`CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST`), TLS buffers to
+PSRAM, static RX buffers trimmed, WiFi IRAM code back to flash, flash-free task
+stacks to PSRAM, and the scan paused while the station associates. The original
+verdict had been measured with PSRAM on but every allocation under 16 KB still
+internal. Only after that:
 
 Worth saying out loud, because the alternative is an open investigation nobody closes.
 If the per-stage budget accounts for nearly all of internal RAM and every remaining

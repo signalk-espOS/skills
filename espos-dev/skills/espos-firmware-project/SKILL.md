@@ -1,13 +1,92 @@
 ---
 name: espos-firmware-project
-description: Build, configure, test and maintain an ESP-IDF firmware on espOS — the CMake prologue, sdkconfig layering, partition tables, the IDF version pin, the locked build wrapper, host tests, bumping the espos submodule and its dependencies.lock, and releasing through espOS's reusable workflows.
+description: Start, build, configure, test and maintain an ESP-IDF firmware on espOS — new-repo setup (secrets, Docker Hub login in CI, Dependabot, release App), the CMake prologue, sdkconfig layering, partition tables, the IDF version pin, the locked build wrapper, host tests, bumping the espos submodule and its dependencies.lock, gating a target on a minimum espOS, and releasing through espOS's reusable workflows.
 ---
 
 # A firmware on espOS
 
-Verified against espOS v0.15.0 / ESP-IDF v6.0.3, October 2026. Primary sources in the
+Verified against espOS v0.18.0 / ESP-IDF v6.0.3, October 2026. Primary sources in the
 espOS tree: `docs/development.md`, `docs/releasing.md`, `cmake/espos_project.cmake`,
 `cmake/espos_version.cmake`, `scripts/build.sh`.
+
+## Starting a new firmware repository
+
+There is no template repository — espOS deleted `espos-template` because it rotted
+five releases behind. Start from an example CI builds on every release:
+`idf.py create-project-from-example "signalk-espos/espos_core:from_registry"` (registry
+consumer), or copy the gateway/cockpit layout for the submodule path below: add
+`espos` as a submodule **at the latest release tag** (`git -C espos checkout vX.Y.Z`,
+never a branch tip), copy `espos/.idf-version` to the repo root, and build only through
+`espos/scripts/build.sh`.
+
+### One-time repository settings (Settings → Actions, Secrets and variables)
+
+| what | where | why |
+|---|---|---|
+| "Allow GitHub Actions to create and approve pull requests" | Settings → Actions → General | release-please and the espOS bump workflow open PRs; without it they fail with zero jobs |
+| signing key, e.g. `<NAME>_SIGNING_KEY_PEM` | **Secret** | release builds refuse to run without it; see `espos-keys-ota-fleet` |
+| `RELEASE_APP_ID`, `RELEASE_APP_PRIVATE_KEY` | **Secrets** | the org's release App token: its pushes and PRs start CI (the workflow token's do not) and it may send the registry's `firmware-released` dispatch |
+| `DOCKERHUB_USERNAME` | **Variable**, the Docker ID | CI pulls the `espressif/idf` image; logged in, Docker Hub rate-limits per account instead of per shared runner IP. The step's `if:` tests it, since an `if:` cannot read a secret |
+| `DOCKERHUB_TOKEN` | **Secret** | the read-only access token for that account |
+
+The Docker Hub pair goes wrong in three quiet ways, all seen on a real repo:
+
+* **A token stored as an Actions *variable*.** `secrets.DOCKERHUB_TOKEN` then reads
+  empty, the login fails with `Password required`, and `continue-on-error` hides it —
+  CI keeps pulling anonymously. Variables are plain text in the settings page and are
+  not masked in logs: a token that sat in one should be rotated.
+* **The email instead of the Docker ID** as username. Logins with an access token want
+  the Docker Hub username shown at the top of hub.docker.com.
+* **A personal password instead of a token.** Create one at hub.docker.com → Account
+  settings → Personal access tokens, scope **Public Repo Read-only** — CI only pulls.
+
+The login step, before every `espressif/esp-idf-ci-action` use, exactly as the gateway
+and cockpit run it:
+
+```yaml
+- name: log in to Docker Hub
+  if: vars.DOCKERHUB_USERNAME != ''
+  continue-on-error: true   # a failed login falls back to an anonymous pull
+  uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+  with:
+    username: ${{ vars.DOCKERHUB_USERNAME }}
+    password: ${{ secrets.DOCKERHUB_TOKEN }}
+```
+
+Without the variable the step is skipped; forks and Dependabot PRs (which get no Actions
+secrets) fail the login and still build. A login in a caller does not reach a reusable
+workflow's jobs: espOS's `build-firmware.yml` has no login step yet, so release builds
+through it pull anonymously.
+
+Pin actions by commit SHA and add a Dependabot entry for them, or pins go stale
+unnoticed (the gateway's `docker/login-action` v3 printed a `punycode` deprecation
+warning on every run until it was bumped by hand):
+
+```yaml
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+```
+
+### Gating a target on a minimum espOS
+
+When a target only works from some espOS release on (the ESP32-C5 BLE gateway needs
+espOS ≥ 0.18.0), refuse the build rather than trusting merge order — otherwise a
+release cut before the submodule bump ships an image that boots and misbehaves:
+
+```cmake
+project(my_firmware)
+idf_build_get_property(_target IDF_TARGET)
+file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/espos/version.txt" _espos_version LIMIT_COUNT 1)
+if(_target STREQUAL "esp32c5" AND _espos_version VERSION_LESS "0.18.0")
+    message(FATAL_ERROR "my-firmware on esp32c5 needs espOS >= 0.18.0; espos is at ${_espos_version}")
+endif()
+```
+
+The target's CI leg stays red until the bump lands, which is the point.
 
 ## Two ways to consume espOS
 
@@ -71,9 +150,10 @@ in a shipped table strands OTA — that is why the gateway and cockpit keep thei
 `[ESPOS_IDF_MIN, ESPOS_IDF_MAX_EXCL)` = `[6.0.0, 6.1.0)` with a warning off the exact pin
 and a fatal error outside (escape: `-DESPOS_ALLOW_IDF_MISMATCH=1`). A consumer's own
 `.idf-version` must equal espOS's. Moving to a newer IDF is its own espOS PR (pin + range
-+ `from_registry/.idf-version` + CI); consumers follow by bumping espOS. Nothing watches
-for new IDF releases automatically — `dependency-drift.yml` and
-`tools/espos_registry_updates.py` cover registry components only.
++ `from_registry/.idf-version` + CI); consumers follow by bumping espOS.
+`tools/espos_idf_updates.py` reports newer IDF releases (patch: move `.idf-version`;
+minor: also `ESPOS_IDF_MAX_EXCL` and the manifests' range), and
+`tools/espos_registry_updates.py` with `dependency-drift.yml` covers registry components.
 
 ## Building
 
@@ -101,7 +181,9 @@ on the machine, `nice`/`ionice`, half the cores (`BUILD_JOBS`), one job under 3 
   `/api/v1/ota/status`.
 * Web UI: `cd espOS/ui && npm ci && npm run dev` (mock server); `npm run build` rewrites
   the committed `components/espos_httpd/ui-dist/`, and CI fails on a stale bundle.
-  `docs/rest-api.md` and `ui/mock/server.mjs` change together.
+  `docs/rest-api.md` and `ui/mock/server.ts` change together. **A Dependabot bump of
+  the UI's npm dependencies fails CI the same way** — Dependabot edits only
+  `package.json` and the lock, so commit a rebuilt bundle on top of its PR.
 
 ## Bumping espOS in a firmware
 
@@ -118,6 +200,12 @@ git commit -am "chore: bump espos to vX.Y.Z"   # "chore!:" when espOS broke API
   "…dependencies.lock not regenerated": merge main into the branch, `idf.py reconfigure`,
   commit the lock, **retitle**, then merge.
 * Copy `.idf-version` from espOS when it changes.
+* espOS's own release PR bumps every `espos_*` manifest; `scripts/regen_lock.sh`
+  regenerates `dependencies.lock` for it (the `release-lock` job does this in CI). A
+  `chore(deps)` merge on espOS `main` can still leave the release branch's lock
+  conflicting: merge `main` into the release branch, run `scripts/regen_lock.sh`,
+  commit — a manual release-please run does not help, as it leaves a branch whose notes
+  did not change alone.
 
 ## Releasing
 

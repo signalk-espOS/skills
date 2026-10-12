@@ -27,8 +27,9 @@ Why a board with 8 MB of PSRAM still exhausts internal RAM, which pool TLS and t
 radio really draw from, and how to size task stacks from a high-water measurement
 instead of a guess. Includes the four PSRAM traps (starting with
 `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` defaulting to 16384, which leaves PSRAM
-entirely unused), and the per-stage boot budget that turns "it runs out of memory"
-into a number you can act on.
+entirely unused), which task stacks can move to PSRAM and which cannot, why IRAM is
+heap on a unified-SRAM part like the C5, and the per-stage boot budget that turns "it
+runs out of memory" into a number you can act on.
 
 ### espos-registry-components
 
@@ -60,10 +61,12 @@ per repo. Load it first.
 
 ### espos-firmware-project
 
-Building a firmware on espOS: the CMake prologue and optional components, sdkconfig
+Starting and building a firmware on espOS: the one-time repository setup (secrets,
+the Docker Hub login CI needs and the three quiet ways it fails, Dependabot for action
+pins, the release App), the CMake prologue and optional components, sdkconfig
 layering, partition tables, the IDF version pin, the locked build wrapper, host tests,
-bumping the `espos` submodule without breaking `dependencies.lock`, and releasing through
-espOS's reusable workflows.
+bumping the `espos` submodule without breaking `dependencies.lock`, gating a target on
+a minimum espOS release, and releasing through espOS's reusable workflows.
 
 ### espos-keys-ota-fleet
 
