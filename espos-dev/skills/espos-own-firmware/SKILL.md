@@ -250,8 +250,9 @@ Each size adds `my-fw-<board|target>-vX.Y.Z-merged-<size>.bin`; the registry lis
 them as the build's `mergedByFlash` without any change to your entry, and the flasher
 writes the largest the chip holds. Leave out a size whose app slots your image would
 fill past ~90 % (the build fails outright if it does not fit), and set the board's
-`flashMinBytes` in the registry to the smallest size you ship. Needs espOS #223 on the
-workflow pin.
+`flashMinBytes` in the registry to the smallest size you ship. The `uses:` pin above
+must be an espOS release that includes espOS #223: `v0.18.1` rejects `flash_tables`
+as an unknown key and stops the release before any build runs.
 
 Assets: `my-fw-<board|target>-vX.Y.Z-{merged,ota}.bin`. The Docker Hub secrets need
 an espOS release newer than v0.18.1; a v0.18.1 pin rejects them as undeclared.
