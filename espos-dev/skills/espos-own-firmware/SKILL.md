@@ -82,6 +82,15 @@ Three files the reference repos have and a new repo forgets:
 * **`.coderabbit.yaml`** — without it CodeRabbit reviews with its defaults. Copy the
   cockpit's and change its `path_filters` to your generated files (`managed_components/`,
   `build*/`, `*.bin`); its `sdkconfig.p4_cockpit*` entries are leftovers from 1.x.
+  Make CodeRabbit skip release-please's PRs, as espOS does: they only bump the version
+  and changelog of changes already reviewed. The cockpit's `"chore(release):"`
+  keyword does not match release-please's `chore: release x.y.z` titles, so use:
+  ```yaml
+  reviews:
+    auto_review:
+      ignore_title_keywords:
+        - "chore: release"
+  ```
 
 ## 3. Stay on the latest espOS automatically
 
