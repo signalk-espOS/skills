@@ -67,6 +67,22 @@ approve pull requests"** (release-please and the tracking workflow open PRs; wit
 they fail with zero jobs), and optionally the Docker Hub variable/secret pair from
 `espos-firmware-project`.
 
+Three files the reference repos have and a new repo forgets:
+
+* **`.github/workflows/pr-title.yml`** — the gateway's checks titles against
+  Conventional Commits, because release-please writes the changelog from them. Its
+  `subjectPattern: ^(?![A-Z]).+$` also rejects a subject that starts with a capital
+  letter: `feat: NMEA 2000 support` fails, `feat: add NMEA 2000 support` passes.
+  Keep the rule or delete the pattern, but know it is there before your first PR.
+* **`AGENTS.md`** plus a one-line **`CLAUDE.md`** (`@AGENTS.md`) — the repo's rules
+  for coding agents: build only through the wrapper, never commit secrets or boat
+  configuration, commit and PR conventions, and whether AI attribution is allowed.
+  Without it an agent follows its own defaults, attribution trailers included. The
+  cockpit's is the model.
+* **`.coderabbit.yaml`** — without it CodeRabbit reviews with its defaults. Copy the
+  cockpit's and change its `path_filters` to your generated files (`managed_components/`,
+  `build*/`, `*.bin`); its `sdkconfig.p4_cockpit*` entries are leftovers from 1.x.
+
 ## 3. Stay on the latest espOS automatically
 
 ### Why not Dependabot for the submodule
