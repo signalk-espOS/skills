@@ -32,7 +32,7 @@ A third-party project already listed in the registry: `BoatHacks/signalk-espOS-8
 | Start | copy the gateway's `CMakeLists.txt`, `main/`, `partitions*.csv`, `sdkconfig.defaults*`, `version.txt`, `.idf-version`, `.gitignore` (keeps `*.pem` and `sdkconfig.local` out of git), `scripts/` | `idf.py create-project-from-example "signalk-espos/espos_core:from_registry"` |
 | Prologue (sdkconfig layering, signing key, `PROJECT_VER`) | yes | no — you carry `partitions.csv`, `sdkconfig.defaults`, `.idf-version`, `version.txt` yourself |
 | Following espOS | `track-espos.yml` opens a PR per release (below) | bump the `^0.x` range by hand |
-| Board variants via the shared release workflow | **not** with `sdkconfig_defaults` (trap below) | yes |
+| Board variants via the shared release workflow | from the first espOS release after v0.18.1 (espOS #221); not before (trap below) | yes |
 
 Take the submodule unless you have a reason not to: every in-house firmware does,
 and the automation below assumes it. Add it at the latest release **tag**:
@@ -237,23 +237,40 @@ firmware:
 Assets: `my-fw-<board|target>-vX.Y.Z-{merged,ota}.bin`. The Docker Hub secrets need
 an espOS release newer than v0.18.1; a v0.18.1 pin rejects them as undeclared.
 
-**Trap: board variants on a submodule project.** `builds` takes
-`{"target","board","sdkconfig_defaults"}`, and `sdkconfig_defaults` is passed as
-`-D SDKCONFIG_DEFAULTS="sdkconfig.defaults;<yours>"`. espOS's prologue treats an
+**Board variants.** `builds` takes `{"target","board","sdkconfig_defaults"}`, one
+defaults file per variant:
+
+```yaml
+builds: >-
+  [{"target": "esp32p4", "board": "7b", "sdkconfig_defaults": "sdkconfig.board.7b"},
+   {"target": "esp32p4", "board": "x7", "sdkconfig_defaults": "sdkconfig.board.x7"}]
+```
+
+From the first espOS release after v0.18.1 (espOS #221) this is safe on a submodule
+project: the workflow passes the files as `ESPOS_EXTRA_SDKCONFIG_DEFAULTS`, which the
+prologue applies after `espos.defaults` and your `sdkconfig.defaults` (a developer's
+`sdkconfig.local` still wins), and a step after the build stops the release unless
+every `CONFIG_` line of the variant's files is in the result. Both halves have to be
+that new: the `uses:` pin, which carries the workflow, and the `espos` submodule,
+which carries the prologue. An older submodule ignores the variable, every variant
+comes out the same, and the check fails the release, which is the point. Locally:
+`idf.py -B build-x7 -DESPOS_EXTRA_SDKCONFIG_DEFAULTS=sdkconfig.board.x7 build`, one
+build directory per board (the variable stays in its CMake cache) and a fresh
+`sdkconfig`.
+
+**Pinned to v0.18.1 or older, it is a trap.** There `sdkconfig_defaults` is passed as
+`-D SDKCONFIG_DEFAULTS="sdkconfig.defaults;<yours>"`, and the prologue treats an
 explicit `SDKCONFIG_DEFAULTS` as "the caller chose" and **drops `espos.defaults`,
 its `.<target>` file and the profile** — the signed-update settings and task stacks
-among them — keeping only the partition fragment. The build can still succeed, with
-an image that is not signed the way your boats expect. On a registry-consumer
-project (no prologue) it works as documented. On a submodule project,
-`release-firmware.yml` has no other hook for a variant, so you write your own release
-job, as the cockpit does: its matrix writes `CONFIG_<YOUR>_BOARD_<X>=y` into
-`sdkconfig.local` (the last of the project's defaults files the prologue reads),
-then fails the leg unless `build/config/sdkconfig.h` defines that symbol, so a
-silently ignored selection cannot publish two identical images under two board
-names. That job also has to attach the images and push the `release-assets` mirror
-itself (`espos-firmware-releases`). The cockpit's names put the board after the
-version, `p4_cockpit-v1.5.5-7b-merged.bin`, so its registry regex differs from the
-one in section 5.
+among them — keeping only the partition fragment. The build succeeds, with an image
+that is not signed the way your boats expect. Either move both pins past v0.18.1, or
+do what the cockpit does in its own release job: write `CONFIG_<YOUR>_BOARD_<X>=y`
+into `sdkconfig.local` per matrix leg, fail the leg unless `build/config/sdkconfig.h`
+defines that symbol, and attach the images and push the `release-assets` mirror
+yourself (`espos-firmware-releases`). A registry-consumer project (no prologue) was
+never affected. The cockpit's names put the board after the version,
+`p4_cockpit-v1.5.5-7b-merged.bin`, so its registry regex differs from the one in
+section 5.
 
 With per-board images, also set `espos_start_opts_t.board` to a fixed string per
 variant and put it in the registry as `reportedAs`, matched exactly; that is what lets

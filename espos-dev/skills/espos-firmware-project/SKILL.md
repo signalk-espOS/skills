@@ -241,9 +241,9 @@ permissions: { contents: write }
 ```
 
 Assets: `<name>-<board|target>-<tag>-{merged,ota}.bin`. A `builds` entry's
-`sdkconfig_defaults` reaches the build as an explicit `SDKCONFIG_DEFAULTS`, which makes
-the prologue drop `espos.defaults`; board variants of a submodule project select the
-board through `sdkconfig.local` instead (`espos-own-firmware`). Today the gateway calls
+`sdkconfig_defaults` is added to espOS's defaults (`ESPOS_EXTRA_SDKCONFIG_DEFAULTS`) from
+the first espOS release after v0.18.1; up to v0.18.1 it replaced them, signed-update
+settings included, so older pins select the board another way (`espos-own-firmware`). Today the gateway calls
 `build-firmware.yml@main` with its own mirror job and the cockpit builds fully inline;
 migrating either changes asset names, so update its registry regex in the same breath.
 Release repos need "Allow GitHub Actions to create pull requests" on, or release-please
