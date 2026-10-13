@@ -50,7 +50,7 @@ and the rollback traps that can delete another release's firmware.
 
 ## espos-dev
 
-Three sibling skills for working on espOS itself and the projects built on it.
+Four sibling skills for working on espOS itself and the projects built on it.
 
 ### espos-ecosystem
 
@@ -67,6 +67,15 @@ pins, the release App), the CMake prologue and optional components, sdkconfig
 layering, partition tables, the IDF version pin, the locked build wrapper, host tests,
 bumping the `espos` submodule without breaking `dependencies.lock`, gating a target on
 a minimum espOS release, and releasing through espOS's reusable workflows.
+
+### espos-own-firmware
+
+The path for a developer outside the project who builds their own firmware on espOS
+and ships it to boats: submodule or component registry, their own signing key,
+following espOS releases with a tracking workflow (and why Dependabot's submodule
+support cannot), building and releasing for several chips and boards (including the
+trap that drops espOS's defaults from a board variant), listing the firmware in the
+registry, and what the README has to tell a boat owner.
 
 ### espos-keys-ota-fleet
 

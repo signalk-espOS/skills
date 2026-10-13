@@ -94,7 +94,7 @@ manager rewrites it to its own mirror).
 ## Listing a firmware in the registry
 
 `signalk-espOS/registry`: one `projects/<id>.json` per firmware; CI (`reindex.yml`,
-nightly 04:17 UTC, on merge, on dispatch) resolves GitHub releases into the committed
+hourly at :17, on merge, on dispatch) resolves GitHub releases into the committed
 `index.json` that the manager and the hosted flasher read with one unauthenticated fetch.
 
 * PR adds **only** `projects/<id>.json`, titled `add: <id>`; `validate.yml` fails any PR
@@ -132,14 +132,3 @@ nightly 04:17 UTC, on merge, on dispatch) resolves GitHub releases into the comm
 
 Manager rules: `start()` never throws, offline is a state not an error, parsers tolerate
 firmware 0.7–0.15 side by side.
-
-## Known gaps (October 2026) — check before relying on them
-
-* Registry `"signed": false` is never turned into a per-build `unsigned`, and the manager
-  only reads `build.unsigned`; no entry sets `signingKeyId`, so the key-mismatch check
-  never fires; `reindex.mjs` emits no `otaSha256`/`mergedSha256` though the manager can
-  verify them.
-* Manager `auth.autoProvision` is declared but not implemented. README: "works, not yet
-  proven on hardware".
-* `espOS/docs/ota.md` still says `<APP>_ALLOW_UNSIGNED_RELEASE`; the workflows read
-  `ESPOS_ALLOW_UNSIGNED_RELEASE`.

@@ -11,6 +11,10 @@ espOS tree: `docs/development.md`, `docs/releasing.md`, `cmake/espos_project.cma
 
 ## Starting a new firmware repository
 
+Building outside the project? `espos-own-firmware` is the end-to-end order of work
+(own key, following espOS releases, several boards, the registry, the README); this
+skill has the detail behind it.
+
 There is no template repository — espOS deleted `espos-template` because it rotted
 five releases behind. Start from an example CI builds on every release:
 `idf.py create-project-from-example "signalk-espos/espos_core:from_registry"` (registry
@@ -71,7 +75,8 @@ Without both, release builds pull anonymously.
 
 Pin actions by commit SHA and add a Dependabot entry for them, or pins go stale
 unnoticed (the gateway's `docker/login-action` v3 printed a `punycode` deprecation
-warning on every run until it was bumped by hand):
+warning on every run until it was bumped by hand). Not `gitsubmodule` for `espos/`:
+it follows espOS `main`, not release tags; `track-espos.yml` (below) does that job. The entry:
 
 ```yaml
 # .github/dependabot.yml
@@ -204,6 +209,9 @@ idf.py reconfigure            # regenerates dependencies.lock where it is commit
 git commit -am "chore: bump espos to vX.Y.Z"   # "chore!:" when espOS broke API
 ```
 
+* A `chore:` bump cuts no firmware release; `track-espos.yml` titles its PRs
+  `fix: bump espOS to vX.Y.Z` so release-please proposes one. Use `fix:` when boats
+  should get the espOS fixes.
 * Cockpit commits `dependencies.lock`; the gateway git-ignores it. Use `reconfigure`,
   **not** `update-dependencies`, so unrelated components do not ride along.
 * Cockpit's `track-espos.yml` does this daily from espOS `releases/latest` and dispatches a
@@ -232,7 +240,10 @@ secrets: { signing_key: "${{ secrets.SIGNING_KEY_PEM }}" }  # inherit does not c
 permissions: { contents: write }
 ```
 
-Assets: `<name>-<board|target>-<tag>-{merged,ota}.bin`. Today the gateway calls
+Assets: `<name>-<board|target>-<tag>-{merged,ota}.bin`. A `builds` entry's
+`sdkconfig_defaults` reaches the build as an explicit `SDKCONFIG_DEFAULTS`, which makes
+the prologue drop `espos.defaults`; board variants of a submodule project select the
+board through `sdkconfig.local` instead (`espos-own-firmware`). Today the gateway calls
 `build-firmware.yml@main` with its own mirror job and the cockpit builds fully inline;
 migrating either changes asset names, so update its registry regex in the same breath.
 Release repos need "Allow GitHub Actions to create pull requests" on, or release-please

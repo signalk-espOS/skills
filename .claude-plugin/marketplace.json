@@ -27,7 +27,7 @@
     {
       "name": "espos-dev",
       "source": "./espos-dev",
-      "description": "Working on espOS and its child repos: which repo owns what and the contracts between them, building and releasing a firmware on espOS, and signing keys, OTA, the registry and fleet updates through signalk-espos-manager.",
+      "description": "Working on espOS and its child repos, or building your own firmware on it: which repo owns what and the contracts between them, building, releasing and keeping a firmware current with espOS on several chips and boards, listing it in the registry, and signing keys, OTA and fleet updates through signalk-espos-manager.",
       "author": {
         "name": "Dirk Wahrheit"
       },
