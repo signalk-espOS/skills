@@ -55,8 +55,19 @@ and cockpit run it:
 
 Without the variable the step is skipped; forks and Dependabot PRs (which get no Actions
 secrets) fail the login and still build. A login in a caller does not reach a reusable
-workflow's jobs: espOS's `build-firmware.yml` has no login step yet, so release builds
-through it pull anonymously.
+workflow's jobs, so espOS's `build-firmware.yml` and `release-firmware.yml` take the two
+values as optional secrets and log in themselves (on `@main`, and in releases newer than
+v0.18.1; a pin to v0.18.1 or older rejects them as undeclared secrets). Pass them next to
+the signing key:
+
+```yaml
+secrets:
+  signing_key: ${{ secrets.SIGNING_KEY_PEM }}
+  dockerhub_username: ${{ vars.DOCKERHUB_USERNAME }}   # or secrets.*, wherever it lives
+  dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
+```
+
+Without both, release builds pull anonymously.
 
 Pin actions by commit SHA and add a Dependabot entry for them, or pins go stale
 unnoticed (the gateway's `docker/login-action` v3 printed a `punycode` deprecation
