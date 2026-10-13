@@ -191,8 +191,10 @@ the wrong image off a board. The gateway runs one P4 image on three boards.
 
 * `sdkconfig.defaults.<target>` — IDF appends it after `sdkconfig.defaults`
   automatically (the gateway's `sdkconfig.defaults.esp32c5`, `.esp32p4`).
-* A partition table per chip — choose it before the prologue, as the gateway does
-  for the C5's bigger app slots:
+* A partition table per chip only when a chip needs different slots — choose it
+  before the prologue, as the gateway does for the C5's bigger app slots. Different
+  **flash sizes** need no table of your own: release with `flash_tables` (below and
+  `espos-firmware-project`, "Partitions"):
   ```cmake
   set(_partitions "${CMAKE_CURRENT_LIST_DIR}/partitions.csv")
   if(IDF_TARGET STREQUAL "esp32c5")
@@ -233,6 +235,24 @@ firmware:
   secrets:
     signing_key: ${{ secrets.SIGNING_KEY_PEM }}
 ```
+
+**One image per flash size.** Dev kits are sold with 4 to 32 MB, and a partition
+table is fixed to one size. Add `"flash_tables"` to a build and the same build is laid
+out once per table, with no extra compile:
+
+```yaml
+builds: >-
+  [{"target": "esp32c6", "flash_tables": "4mb 8mb 16mb"},
+   {"target": "esp32c5", "flash_tables": "16mb"}]
+```
+
+Each size adds `my-fw-<board|target>-vX.Y.Z-merged-<size>.bin`; the registry lists
+them as the build's `mergedByFlash` without any change to your entry, and the flasher
+writes the largest the chip holds. Leave out a size whose app slots your image would
+fill past ~90 % (the build fails outright if it does not fit), and set the board's
+`flashMinBytes` in the registry to the smallest size you ship. The `uses:` pin above
+must be an espOS release that includes espOS #223: `v0.18.1` rejects `flash_tables`
+as an unknown key and stops the release before any build runs.
 
 Assets: `my-fw-<board|target>-vX.Y.Z-{merged,ota}.bin`. The Docker Hub secrets need
 an espOS release newer than v0.18.1; a v0.18.1 pin rejects them as undeclared.
