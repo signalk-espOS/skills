@@ -155,10 +155,48 @@ through `sdkconfig.local` instead.
 ## Partitions
 
 Bundled tables `${ESPOS_PARTITIONS_DIR}/{4,8,16}mb.csv`: nvs, otadata, phy, nvs_keys,
-coredump, `ota_0`/`ota_1`, LittleFS `storage` (web UI). A project table sets **no flash
+coredump, `ota_0`/`ota_1`, LittleFS `storage`. A project table sets **no flash
 size**, so a 16 MB custom table also needs `CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y`, or the
-4 MB fallback applies. A device keeps its partition table across OTA: changing offsets
-in a shipped table strands OTA — that is why the gateway and cockpit keep their own.
+4 MB fallback applies.
+
+**One table per flash size, never one per board.** What makes that work (checked in
+ESP-IDF 6.0.3, `esp_system/port/cpu_start.c`, `spi_flash/esp_flash_spi_init.c`):
+
+* The app depends on no table. It finds partitions by name, and the flash size it
+  uses is the **bootloader** header's, which esptool rewrites at merge time. So one
+  build per chip serves every flash size; nothing is recompiled per size.
+* A header naming more flash than the chip has stops the app at boot ("Detected size
+  smaller than the size in the binary image header"). A 16 MB-layout image written to
+  an 8 MB board flashes fine and never starts. Hence one image per size.
+* An OTA writes only the idle app slot. The table, `nvs` (settings, WiFi, token,
+  keys), `nvs_keys` and `storage` survive every update. A table change reaches only
+  boards flashed over USB, and changing offsets in a shipped table does **not** break
+  OTA for boards on the old one, as long as the image still fits their slots.
+* The OTA image is one file for every board of a chip, so it must fit the smallest
+  app slot of every table ever offered for that chip. Too-small slots are the
+  expensive mistake: only a USB reflash moves a board off them (the C5's 2.5 MB slots).
+
+Rules:
+
+1. Release with espOS's `flash_tables` (`build-firmware.yml` input, or a key per
+   `release-firmware.yml` build, espOS #223): `"4mb 8mb 16mb"` lays the same build
+   out with each bundled table as `<name>-<tag>-merged-<size>.bin`; `"8mb=own.csv"`
+   names your own. The build fails if the app does not fit a table's slots, if
+   `nvs` would shrink or vanish, or if a non-LittleFS data partition changes size.
+   The registry lists them as `mergedByFlash`; the flasher reads the chip and writes
+   the largest that fits.
+2. Offer a size only where the app stays under ~90 % of its slots (Bluedroid images,
+   ~2 MB, skip 4 MB's 1728 KB slots) and set the registry's `flashMinBytes` to the
+   smallest size offered.
+3. Boards with 32 MB use the 16 MB table: flash past 16 MB needs 32-bit addressing,
+   which ESP-IDF refuses on ESP32-P4 v0.x and calls high-risk on the C6.
+4. `nvs` is 128K in every bundled table from espOS #224 (48K before; boards flashed
+   then keep it). Keep it the same size in every table a project offers.
+5. Bring your own table only for an extra partition (the cockpit's wake-word `model`
+   and `layout`). Then give each flash size its own CSV, keep non-LittleFS data
+   partitions the same size in all of them, and pass them as `SIZE=CSV`.
+6. Never resize the table over the air. ESP-IDF can, but a power cut during the
+   write leaves a board only a USB flash revives.
 
 ## IDF version: a strict pin, not "latest"
 
