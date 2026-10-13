@@ -56,7 +56,9 @@ and cockpit run it:
 Without the variable the step is skipped; forks and Dependabot PRs (which get no Actions
 secrets) fail the login and still build. A login in a caller does not reach a reusable
 workflow's jobs, so espOS's `build-firmware.yml` and `release-firmware.yml` take the two
-values as optional secrets and log in themselves. Pass them next to the signing key:
+values as optional secrets and log in themselves (on `@main`, and in releases newer than
+v0.18.1; a pin to v0.18.1 or older rejects them as undeclared secrets). Pass them next to
+the signing key:
 
 ```yaml
 secrets:
