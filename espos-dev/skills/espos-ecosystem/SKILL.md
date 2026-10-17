@@ -1,6 +1,6 @@
 ---
 name: espos-ecosystem
-description: Orientation for working on espOS or any of its child repos (registry, signalk-espos-manager, espos-p4-cockpit, espos-ble-gateway, the cockpit WASM, signalk-hmi-designer, signalk-espos-stream) — which repo owns what, the contracts between them, and the house rules that differ per repo. Load first in any espOS session.
+description: Orientation for working on espOS or any of its child repos (registry, signalk-espos-manager, espos-p4-cockpit, espos-ble-gateway, espos-nmea-gateway, the cockpit WASM, signalk-hmi-designer, signalk-espos-stream) — which repo owns what, the contracts between them, and the house rules that differ per repo. Load first in any espOS session.
 ---
 
 # The espOS ecosystem
@@ -25,6 +25,7 @@ releases; a SignalK plugin keeps a boat's devices updated from it.
 | `signalk-espOS/skills` | These skills | Markdown |
 | `dirkwa/espos-p4-cockpit` | ESP32-P4 panel firmware: JSON Layout Player (LVGL), N2K gateway, voice | C/C++, has AGENTS.md |
 | `dirkwa/espos-ble-gateway` | BLE → signalk-server BLE provider API. `main.c` is one `espos_start(NULL)`; logic lives in espOS `espos_ble` | C, no AGENTS.md |
+| `dirkwa/espos-nmea-gateway` | NMEA 2000 (CAN, candump over TCP) to Wi-Fi gateway on espOS `espos_n2k`; NMEA 0183 over a UART planned. Decodes nothing; squash-merge only | C, has AGENTS.md |
 | `dirkwa/espos-p4-cockpit-wasm` | Cockpit `widget_factory.cpp` + LVGL in WASM for the designer preview. Committed `public/jlp_wasm.{js,wasm}` | C++/emscripten |
 | `dirkwa/signalk-hmi-designer` | SignalK webapp + plugin that designs/pushes JLP layouts | TS/React |
 | `dirkwa/signalk-espos-stream` | SignalK plugin: Chromium-in-container → MJPEG to the cockpit `stream` widget | TS, container |
@@ -76,9 +77,10 @@ gates OTA.
 * **cockpit, gateway, wasm, designer, stream, registry, manager**: no AI attribution
   anywhere — no `Co-Authored-By`, no "Generated with" — this overrides default tool
   attribution. Never auto-commit or push unless asked.
-* **Licences differ**: espOS, registry, gateway are Apache-2.0; cockpit, wasm, designer
-  (≥0.2.0), stream are source-available "no redistribution". Never propose relicensing.
-  Runtime/bundled deps of the source-available repos must stay permissive.
+* **Licences differ**: espOS, registry, manager, both gateways, designer and stream are
+  Apache-2.0 (designer 0.2.0 to 0.3.0-beta.2 shipped source-available; never retag or
+  rewrite them); cockpit and wasm are source-available "no redistribution". Never
+  propose relicensing. Runtime and bundled deps must stay permissive everywhere.
 * Never commit SSIDs, passwords, IPs, API keys or `*.pem`; espOS CI
   (`scripts/check_no_secrets.sh`) fails on tracked `*.pem`, `secrets/`, `*.nvs.*`.
 * No version bumps or release work unless the user says release; release-please owns

@@ -126,9 +126,23 @@ Prologue arguments: `NAME`, `PARTITIONS` (default 4 MB table), `COMPONENTS`,
 defaults.
 
 **Optional components are excluded unless named in `COMPONENTS`:** `espos_ble espos_eth
-espos_n2k espos_power espos_prov espos_voice espos_audio`. `espos_start()` only starts
+espos_n2k espos_nmea0183 espos_power espos_prov espos_sdlog espos_voice espos_audio
+espos_usb_storage` (the list in `cmake/espos_project.cmake`). `espos_start()` only starts
 what is in the build, so dropping one is silent — no BLE gateway, no Ethernet on a PoE P4.
-Also list them in `main/CMakeLists.txt` `PRIV_REQUIRES`.
+A name that is not on the list fails configure; `espos_voice` brings `espos_audio` along.
+Also list them in `main/CMakeLists.txt` `PRIV_REQUIRES`. Installed from the registry,
+`REQUIRES` alone is enough.
+
+Added in 0.20.0:
+
+* `espos_nmea0183` — NMEA 0183 sentences off a UART, checksummed, decoded into Signal K
+  units and published (GPS, compass, depth). `docs/nmea0183.md`.
+* `espos_sdlog` — a microSD card over SDMMC or SPI and power-cut-safe sessions of rows,
+  each closed with a row count and sha256. The card's FatFs has no long file names, so
+  every file name is 8.3. `docs/sdlog.md`.
+* `espos_usb_storage` — exports a microSD card over USB device mode to a chartplotter or
+  PC and follows the append-only files the host writes; espOS never writes to the card
+  while it is exported. ESP32-P4 and ESP32-S3 only. `docs/usb-storage.md`.
 
 **Registry (third parties, `espos-release-test`).**
 `idf.py create-project-from-example "signalk-espos/espos_core:from_registry"` or
@@ -137,12 +151,34 @@ archive), so the project carries its own `partitions.csv`, `sdkconfig.defaults`,
 `.idf-version`, `version.txt` and a hand-made signing key;
 `espos_core/project_include.cmake` fails configure and prints the missing lines.
 
+## Publishing to Signal K: live data only
+
+`espos_sk_publish_*` sends deltas under `vessels.self`, stamped with the wall-clock time
+when the batching window closes. Deltas are for **live** data: signalk-server keeps a
+delta's timestamp but its full model overwrites the latest value without comparing
+timestamps, so replaying recorded data walks every plugin and client back through old
+values. Recorded data (an SD backlog, a chartplotter's log files) goes to its consumer as
+a batch upload, not as deltas. The offline ring is the one bounded exception: it holds a
+short outage and ends on current values.
+
+A device that measures for **another vessel** (a dinghy reporting to the mothership's
+server) publishes with `espos_sk_publish_{number,string,bool,json}_ctx(context, ...)`,
+from the release after 0.20.0 (espOS #233). `espos_sk_vessel_context()` returns the
+device's own `vessels.urn:mrn:signalk:uuid:<uuid>`, generated once and kept in NVS
+(`skstate`/`vessel_id`, separate from the access-request client id), and the status JSON
+reports it as `vessel_context`. One batch holds up to four contexts and sends one delta
+per context. Never use an MMSI context for a vessel without its own AIS. Details in
+`docs/signalk.md`, "Delta stream".
+
 ## sdkconfig layering (later wins)
 
 1. `espos/sdkconfig.d/espos.defaults` (+ `.esp32`, `.esp32p4` — P4 file hard-wires the
-   Waveshare SDIO pins for the C6 co-processor; other P4 boards must override)
+   Waveshare SDIO pins for the C6 co-processor; other P4 boards must override). From the
+   release after 0.20.0 it builds for size (`-Os`, espOS #234), which keeps the C5 and C6
+   images at ~82 % of the 4 MB table's slots; espOS CI fails an image over 90 %.
 2. `espos/sdkconfig.d/<profile>.defaults` — **`release` burns flash-encryption eFuses,
-   one-way.** `debug` adds heap poisoning, stack checks, debug logging.
+   one-way.** `debug` adds heap poisoning, stack checks, debug logging, and builds with
+   `-Og` after 0.20.0 so a debugger sees the variables.
 3. project `sdkconfig.defaults` (+ `.<target>`) — only what differs from espOS
 4. `sdkconfig.local` — git-ignored bench overrides (board choice, local tweaks)
 5. generated partition + flash-size fragment, then the signing fragment
