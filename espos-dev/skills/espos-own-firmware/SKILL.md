@@ -12,8 +12,8 @@ project; `espos-firmware-project` has the detail behind each step and
 this in production:
 
 * [dirkwa/espos-ble-gateway](https://github.com/dirkwa/espos-ble-gateway): five
-  chips, one image per chip and an 8 and 16 MB layout of each, espOS's shared
-  `build-firmware.yml`. **Start here** for the project layout.
+  chips, one image per chip, 8 and 16 MB layouts for the ESP32, S3 and C6 dev kits,
+  espOS's shared `build-firmware.yml`. **Start here** for the project layout.
 * [dirkwa/espos-p4-cockpit](https://github.com/dirkwa/espos-p4-cockpit): one chip,
   two display boards, one image per board, a fully inline release job.
 

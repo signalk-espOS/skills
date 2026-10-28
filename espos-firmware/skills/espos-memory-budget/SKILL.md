@@ -154,10 +154,11 @@ Three cautions that cost real time:
   oversized; it shows the measurement was incomplete. Take the reading against the
   heaviest workload the build supports (a `wss` server if TLS is compiled in).
   The 8192 B task above that used 5272 B was the espOS Signal K stream task on a quiet
-  run. A 112-minute run of the same build, with REST requests every 10 minutes and an
-  OTA attempt with a real TLS handshake every 30, peaked at 6904 B, so the default went
-  to 10240 (espOS #212). Measure long and busy, and write down what the run did not
-  exercise.
+  run. A 112-minute run of the same build, with REST requests every 10 minutes and OTA
+  attempts on other tasks, peaked at 6904 B, so the default went to 10240 (espOS #212).
+  That run was still plain ws, with no TLS on the stream task, and the PR says so,
+  which is why nothing was lowered from it. Measure long and busy, and write down what
+  the run did not exercise.
 * **Never shrink a stack and change memory configuration in the same flash.** A
   too-small stack corrupts rather than failing cleanly, and PSRAM/flash settings are
   applied by the bootloader. A bad combination can leave the chip unable to boot far

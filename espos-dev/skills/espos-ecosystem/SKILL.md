@@ -43,8 +43,8 @@ the prose, and fix the prose when you touch it.
 
 The firmware repos copy each other's workflows (`ci.yml`, `release-firmware.yml`,
 `track-espos.yml`, `pr-title.yml`). Fixes land in the newest copy first and reach the
-older ones later, if at all. Copy from the newest repo (bathy-bridge or the Zigbee
-coordinator) and compare with the gateway's; `espos-own-firmware` lists the known
+older ones later, if at all. Copy from the newest repo (bathy-bridge, or the Zigbee
+coordinator once its first PR merges) and compare with the gateway's; `espos-own-firmware` lists the known
 differences.
 
 ## Where a change belongs
@@ -86,8 +86,9 @@ differences.
   even though the lock was fixed).
 * Release notes are the ones GitHub generates: each PR's title, author and link, sorted
   by a label that `label-by-title.yml` sets from the title's type (`.github/release.yml`).
-  Only `feat`, `fix`, `perf`, `revert`, a breaking change (and in some repos
-  `refactor` or `build(deps)`) refreshes the release PR. Read the repo's AGENTS.md.
+  Only `feat`, `fix`, `perf`, `revert`, a breaking change or a `Release-As:` footer
+  refreshes the release PR; espOS and bathy-bridge add `refactor`, stream and designer
+  `build(deps)`. The gate is in the repo's release workflow and its AGENTS.md.
 * **Squash-merge every PR**, the release PR included. release-please reads a merge
   commit and the branch commits under it as separate changes, so a merge commit lists
   the change twice and without its PR number (NMEA gateway 0.2.0).

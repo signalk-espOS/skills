@@ -44,8 +44,9 @@ The Docker Hub pair goes wrong in three quiet ways, all seen on a real repo:
 * **A personal password instead of a token.** Create one at hub.docker.com → Account
   settings → Personal access tokens, scope **Public Repo Read-only**, since CI only pulls.
 
-The login step, before every `espressif/esp-idf-ci-action` use, exactly as the gateway
-and cockpit run it:
+The login step, before every `espressif/esp-idf-ci-action` use, as the gateway and
+cockpit run it (pinned here to the v4.7.0 that espOS and the NMEA gateway use; the
+others still pin v4.6.0):
 
 ```yaml
 - name: log in to Docker Hub
@@ -285,8 +286,9 @@ on the machine, `nice`/`ionice`, half the cores (`BUILD_JOBS`), one job under 3 
 `BUILD_NOWAIT=1` to fail instead of queueing. CI needs `fetch-depth: 0`, or
 `git describe` breaks and so does the version the device reports.
 
-Compiler warnings are errors (IDF 6 default), but CMake and linker warnings are not:
-`idf.py build` succeeds with them. For a zero-warnings rule, keep the log and gate on
+Not every warning fails the build. IDF builds with `-Werror=all` but exempts a few
+(`-Wno-error=` for unused functions and variables and deprecated declarations), and
+CMake and linker warnings are never errors, so `idf.py build` succeeds with them. For a zero-warnings rule, keep the log and gate on
 it, as `espos-bathy-bridge`'s `ci.yml` does: `set -o pipefail; idf.py build 2>&1 | tee
 build.log`, then fail on any `warning:` line or `CMake Warning` block except the
 expected "generating a development RSA-3072 signing key" (CMake wraps that text over
@@ -307,7 +309,9 @@ several lines, so read each block with the lines after it).
   the UI's npm dependencies fails CI the same way.** Dependabot edits only
   `package.json` and the lock, so commit a rebuilt bundle on top of its PR. Since
   espOS 0.17.3 the bundle is also built into the app image (`CONFIG_ESPOS_HTTPD_UI_EMBED`,
-  about 25 KiB) and served ahead of `storage`, so an OTA brings the matching page;
+  about 25 KiB) and served ahead of `storage`, so an OTA brings the matching page. A
+  project that passes its own UI with `espos_project_ui_partition(DIR ...)` is still
+  served from `storage`, which only a USB flash rewrites;
   `GET /api/v1/system/info` → `ui` reports `embedded`, `storage` or `placeholder`.
 
 ## Bumping espOS in a firmware

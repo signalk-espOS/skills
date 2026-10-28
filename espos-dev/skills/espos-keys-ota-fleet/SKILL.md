@@ -96,9 +96,10 @@ manager rewrites it to its own mirror).
 `http://` URLs are fine (`CONFIG_ESP_HTTPS_OTA_ALLOW_HTTP`): integrity is the signature.
 
 What an OTA changes and what it keeps: it writes the idle app slot only. The partition
-table, `nvs` (settings, WiFi, token, keys), `nvs_keys` and `storage` survive. The web UI
-is built into the app image since espOS 0.17.3 (#202), so an OTA brings the page that
-matches its firmware; `GET /api/v1/system/info` → `ui` says `embedded`, `storage` or
+table, `nvs` (settings, WiFi, token, keys), `nvs_keys` and `storage` survive. espOS's own web UI
+is built into the app image since 0.17.3 (#202), so an OTA brings the page that
+matches its firmware (a custom UI passed as `espos_project_ui_partition(DIR ...)` still
+lives in `storage` and does not move); `GET /api/v1/system/info` → `ui` says `embedded`, `storage` or
 `placeholder`. A partition-table change reaches only boards flashed over USB.
 
 ## The P4's radio co-processor (C6)
@@ -122,9 +123,10 @@ and holds a firmware update until a radio update has finished. Details in
 ## Listing a firmware in the registry
 
 `signalk-espOS/registry`: one `projects/<id>.json` per firmware, plus a board
-catalogue (`boards/<id>.json`: vendor, model, photo, chip, `flashSizes`, `usbBridge`,
-`factoryApps`) and use cases (`usecases/<id>.json`: an owner-worded job with ranked
-boards). CI resolves GitHub releases into the committed `index.json` that the manager
+catalogue (`boards/<id>.json`: `vendor`, `model`, `target`, `image`, `flashSizes`,
+`usbBridge`, `factoryApps`, …) and use cases (`usecases/<id>.json`: an owner-worded job,
+the `needs` a board must meet, the `projects` that do it and per-board `reasons`).
+Both schemas refuse unknown keys. CI resolves GitHub releases into the committed `index.json` that the manager
 and the flasher read with one unauthenticated fetch.
 
 * A PR adds **only** `projects/<id>.json` (and a `boards/` file for a new board),
