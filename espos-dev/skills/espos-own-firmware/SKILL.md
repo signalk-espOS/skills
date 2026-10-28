@@ -1,6 +1,6 @@
 ---
 name: espos-own-firmware
-description: The path for a developer outside the espOS project who builds their own firmware on espOS and ships it to boats: choosing submodule or registry, their own signing key, keeping up with espOS releases automatically (track-espos.yml, and why Dependabot cannot do it), building and releasing for several chips and boards, listing the firmware in the signalk-espOS registry, and what the README must tell the boat owner.
+description: "The path for a developer outside the espOS project who builds their own firmware on espOS and ships it to boats: choosing submodule or registry, their own signing key, keeping up with espOS releases automatically (track-espos.yml, and why Dependabot cannot do it), building and releasing for several chips and boards, listing the firmware in the signalk-espOS registry, and what the README must tell the boat owner."
 ---
 
 # Your own firmware on espOS, from repo to boat
@@ -82,7 +82,7 @@ approve pull requests"** (release-please and the tracking workflow open PRs; wit
 they fail with zero jobs), and optionally the Docker Hub variable/secret pair from
 `espos-firmware-project`.
 
-Four files the reference repos have and a new repo forgets:
+Four things the reference repos have and a new repo forgets:
 
 * **`.github/workflows/pr-title.yml`**: the gateway's checks titles against
   Conventional Commits, because release-please writes the changelog from them. Its

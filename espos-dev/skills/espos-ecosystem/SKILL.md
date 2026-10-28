@@ -1,6 +1,6 @@
 ---
 name: espos-ecosystem
-description: Orientation for working on espOS or any of its child repos (registry, signalk-espos-manager, espos-p4-cockpit, espos-ble-gateway, espos-nmea-gateway, espos-bathy-bridge, espos-zigbee-coordinator, the cockpit WASM, signalk-hmi-designer, signalk-espos-stream). Which repo owns what, the contracts between them, and the house rules that differ per repo. Load first in any espOS session.
+description: "Orientation for working on espOS or any of its child repos (registry, signalk-espos-manager, espos-p4-cockpit, espos-ble-gateway, espos-nmea-gateway, espos-bathy-bridge, espos-zigbee-coordinator, the cockpit WASM, signalk-hmi-designer, signalk-espos-stream). Which repo owns what, the contracts between them, and the house rules that differ per repo. Load first in any espOS session."
 ---
 
 # The espOS ecosystem

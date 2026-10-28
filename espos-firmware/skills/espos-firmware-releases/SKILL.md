@@ -1,6 +1,6 @@
 ---
 name: espos-firmware-releases
-description: Publish firmware a browser-based flasher can actually download. Why GitHub release assets are unreachable from a web page, how to mirror them to a branch safely with force-with-lease, the GitHub Actions concurrency behaviour that silently drops a release (and the queue key that stops it), and the version-sort and no-checkout traps in release scripts.
+description: "Publish firmware a browser-based flasher can actually download. Why GitHub release assets are unreachable from a web page, how to mirror them to a branch safely with force-with-lease, the GitHub Actions concurrency behaviour that silently drops a release (and the queue key that stops it), and the version-sort and no-checkout traps in release scripts."
 ---
 
 # Publishing firmware a web flasher can fetch
@@ -170,8 +170,12 @@ holding neither release.
   comparison.
 * **A job without a checkout cannot `git push`.** A release job that only downloads
   artifacts has no repository, so a rollback's `git push --delete "$remote" branch`
-  fails there and leaves a branch a failed first release created. Delete through the
-  API instead: `gh api -X DELETE repos/$REPO/git/refs/heads/<branch>`.
+  fails there and leaves a branch a failed first release created. Push from an empty
+  repository instead, which keeps the lease against the commit this run pushed:
+  `git init -q "$RUNNER_TEMP/rb" && git -C "$RUNNER_TEMP/rb" push --force-with-lease="<branch>:$sha" "$remote" ":<branch>"`.
+  The REST call `gh api -X DELETE repos/$REPO/git/refs/heads/<branch>` also works
+  without a checkout, but it takes no expected SHA, so it would delete a branch another
+  release has meanwhile pushed to.
 * **Write generated files after the restore.** A README written into the work tree
   before `git checkout FETCH_HEAD -- .` restores the branch is overwritten by the
   previous run's copy, which names the previous tag.

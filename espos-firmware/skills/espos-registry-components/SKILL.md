@@ -1,6 +1,6 @@
 ---
 name: espos-registry-components
-description: Why an IDF component's optional dependencies and feature checks silently stop working when the component is installed from the ESP Component Registry instead of a checkout: namespaced target names, and the idf_component_optional_requires defect that follows from them.
+description: "Why an IDF component's optional dependencies and feature checks silently stop working when the component is installed from the ESP Component Registry instead of a checkout: namespaced target names, and the idf_component_optional_requires defect that follows from them."
 ---
 
 # Component checks that survive a registry install

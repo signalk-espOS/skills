@@ -1,6 +1,6 @@
 ---
 name: espos-keys-ota-fleet
-description: Signing keys, OTA and fleet updates for espOS devices. Dev vs named vs CI signing keys and why a wrong key strands OTA, the device OTA flow and manifest, the P4's radio co-processor update, listing a firmware in the signalk-espOS registry, and how signalk-espos-manager flashes, discovers, authenticates (fleet API key) and updates a boat's devices.
+description: "Signing keys, OTA and fleet updates for espOS devices. Dev vs named vs CI signing keys and why a wrong key strands OTA, the device OTA flow and manifest, the P4's radio co-processor update, listing a firmware in the signalk-espOS registry, and how signalk-espos-manager flashes, discovers, authenticates (fleet API key) and updates a boat's devices."
 ---
 
 # Keys, OTA and keeping a fleet current
@@ -149,8 +149,8 @@ When the index is rebuilt: `reindex.yml` runs hourly, on merge and on a
 `firmware-released` repository dispatch. GitHub runs the hourly cron late or drops it,
 so the official firmware repos end each release with a `notify-registry` job that sends
 the dispatch (it needs write access to the registry, which outside projects lack).
-`concurrency.queue: max` keeps every queued run waiting instead of cancelling the
-release's run behind the hourly one. A release missing from the manager is almost
+`concurrency.queue: max` keeps up to 100 runs waiting, so the hourly run no longer
+cancels the run a release asked for (by default a group keeps one waiting run). A release missing from the manager is almost
 always a stale index: a manual `workflow_dispatch` of `reindex.yml` fixes it.
 
 ## The manager: new boat, kept current
@@ -161,7 +161,7 @@ always a stale index: a manual `workflow_dispatch` of `reindex.yml` fixes it.
    registry's use cases) or which board it is, reads the chip, flash size, USB bridge
    and any firmware already on it ("This looks like…"), and writes the largest
    `mergedByFlash` image that fits. It refuses an image whose bootloader header names
-   more flash than the chip has: such an image flashes and then never boots.
+   more flash than the chip has, because such an image writes fine and then never boots.
    esptool-js runs with `flashSize: "keep"` so signed images aren't rewritten.
 2. **Discovery:** mDNS `_espos._tcp`, keyed on TXT `id`; plus `staticHosts` and Signal K
    `espos.<device>.*` hints. Whether a key is needed: `GET /api/v1/system/ping` → `auth`.

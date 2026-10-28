@@ -1,6 +1,6 @@
 ---
 name: espos-firmware-project
-description: Start, build, configure, test and maintain an ESP-IDF firmware on espOS: new-repo setup (secrets, Docker Hub login in CI, Dependabot, the release App), the CMake prologue, sdkconfig layering, partition tables per flash size, the IDF version pin, the locked build wrapper and a warning gate, host tests, publishing live and dated Signal K data, bumping the espos submodule and its dependencies.lock, gating a target on a minimum espOS, and releasing through espOS's reusable workflows with GitHub-generated notes.
+description: "Start, build, configure, test and maintain an ESP-IDF firmware on espOS: new-repo setup (secrets, Docker Hub login in CI, Dependabot, the release App), the CMake prologue, sdkconfig layering, partition tables per flash size, the IDF version pin, the locked build wrapper and a warning gate, host tests, publishing live and dated Signal K data, bumping the espos submodule and its dependencies.lock, gating a target on a minimum espOS, and releasing through espOS's reusable workflows with GitHub-generated notes."
 ---
 
 # A firmware on espOS

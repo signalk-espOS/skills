@@ -1,6 +1,6 @@
 ---
 name: espos-memory-budget
-description: Diagnose out-of-memory failures on ESP32 firmware (espOS or any ESP-IDF project): why PSRAM appears to do nothing, why a classic ESP32 reports internal RAM that malloc cannot get, which pool TLS and the radio really draw from, how to size task stacks from measurement instead of guesswork, and what keeps an image inside its app slot.
+description: "Diagnose out-of-memory failures on ESP32 firmware (espOS or any ESP-IDF project): why PSRAM appears to do nothing, why a classic ESP32 reports internal RAM that malloc cannot get, which pool TLS and the radio really draw from, how to size task stacks from measurement instead of guesswork, and what keeps an image inside its app slot."
 ---
 
 # Diagnosing an ESP32 memory budget
@@ -139,8 +139,8 @@ CONFIG_FREERTOS_USE_TRACE_FACILITY=y
 ```
 ```c
 TaskHandle_t h = xTaskGetHandle("my_task");
-/* high water = the SMALLEST free the stack ever had, in words */
-size_t unused = uxTaskGetStackHighWaterMark(h) * sizeof(StackType_t);
+/* high water = the SMALLEST free the stack ever had; ESP-IDF returns bytes */
+size_t unused = uxTaskGetStackHighWaterMark(h);
 ```
 
 Real numbers from one firmware: a task given 12288 B used **1488**, 12 %. Another
@@ -160,8 +160,9 @@ Three cautions that cost real time:
   which is why nothing was lowered from it. Measure long and busy, and write down what
   the run did not exercise.
 * **Never shrink a stack and change memory configuration in the same flash.** A
-  too-small stack corrupts rather than failing cleanly, and PSRAM/flash settings are
-  applied by the bootloader. A bad combination can leave the chip unable to boot far
+  too-small stack corrupts rather than failing cleanly, and the flash mode, frequency
+  and size live in the bootloader header, which esptool writes at flash time. A bad
+  combination can leave the chip unable to boot far
   enough to serve USB-JTAG, needing a physical BOOT+RESET. One risky variable per
   flash, and have a known-good image ready.
 * **If you make a stack size configurable, floor it above what you measured.** An
