@@ -1,6 +1,6 @@
 ---
 name: espos-registry-components
-description: Why an IDF component's optional dependencies and feature checks silently stop working when the component is installed from the ESP Component Registry instead of a checkout — namespaced target names, and the idf_component_optional_requires defect that follows from them.
+description: "Why an IDF component's optional dependencies and feature checks silently stop working when the component is installed from the ESP Component Registry instead of a checkout: namespaced target names, and the idf_component_optional_requires defect that follows from them."
 ---
 
 # Component checks that survive a registry install
@@ -10,7 +10,7 @@ Verified against ESP-IDF **v6.0.3**, September 2026.
 ## The failure
 
 A component behaves one way from a git checkout and differently when a consumer
-installs it from the ESP Component Registry — with **no error and no warning**. Code
+installs it from the ESP Component Registry, with **no error and no warning**. Code
 takes its "that component is not in this build" branch, features compile out, and the
 build goes green.
 
@@ -28,7 +28,7 @@ endif()
 One real instance: a firmware's one-call startup function decided at configure time
 which optional subsystems existed. Installed from the registry it brought up no WiFi,
 no data client and no OTA on a build that had linked all three. Nothing failed; the
-features simply were not compiled in. The proof is blunt — grep the build's
+features simply were not compiled in. The proof is blunt: grep the build's
 `compile_commands.json` for your define and find it absent.
 
 ## `idf_component_optional_requires()` has the same defect
@@ -52,7 +52,7 @@ away in CMake.
 
 ## The fix
 
-Match on the entries of `BUILD_COMPONENTS` themselves — exactly, or on a `__<name>`
+Match on the entries of `BUILD_COMPONENTS` themselves, exactly or on a `__<name>`
 suffix. Suffix-match rather than stripping a literal namespace, so a fork or mirror
 published under a different namespace keeps working:
 
@@ -92,7 +92,7 @@ endfunction()
 
 **Pass the resolved name, not the bare one**, to `idf_component_get_property()`. It
 raises a `FATAL_ERROR` on a name it cannot resolve, and its own bare-name fallback
-works only once that component has been registered — which is not guaranteed at the
+works only once that component has been registered, which is not guaranteed at the
 point these run. Verified the hard way: passing the bare name failed with
 `Failed to resolve component 'espos_sk'`.
 
@@ -125,8 +125,8 @@ including their own copies harmless.
 ## Your CI probably cannot catch this
 
 This is the part worth internalising. If your "install from the registry" example uses
-`override_path` to build against the local tree — which is the normal way to keep such
-an example honest in-repo — then it builds under the **bare** names too. The one
+`override_path` to build against the local tree (the normal way to keep such
+an example honest in-repo), then it builds under the **bare** names too. The one
 configuration that would notice the bug is the one CI does not have.
 
 So add a cheap static check instead, and run it in CI:
@@ -138,7 +138,7 @@ So add a cheap static check instead, and run it in CI:
 * use `re.S` / multiline matching: CMake lets a condition wrap, and
   `if(mycomp\n   IN_LIST comps)` is the same bug split over two lines
 * if components ship duplicate copies of the helper file, assert they are
-  **byte-identical** — duplication that drifts reintroduces exactly what the check
+  **byte-identical**: duplication that drifts reintroduces exactly what the check
   exists to prevent
 
 To reproduce a registry layout locally without publishing anything: copy the
@@ -148,5 +148,5 @@ every manifest**. Then check your defines actually appear in
 
 ## Related
 
-`espos-firmware-releases` covers the other half of publishing — getting release
+`espos-firmware-releases` covers the other half of publishing: getting release
 images to a place a browser can fetch them.
