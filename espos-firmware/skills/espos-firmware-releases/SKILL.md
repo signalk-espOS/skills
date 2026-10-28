@@ -1,16 +1,16 @@
 ---
 name: espos-firmware-releases
-description: Publish firmware a browser-based flasher can actually download — why GitHub release assets are unreachable from a web page, how to mirror them to a branch safely with force-with-lease, and the GitHub Actions concurrency behaviour that silently drops a release.
+description: Publish firmware a browser-based flasher can actually download. Why GitHub release assets are unreachable from a web page, how to mirror them to a branch safely with force-with-lease, the GitHub Actions concurrency behaviour that silently drops a release (and the queue key that stops it), and the version-sort and no-checkout traps in release scripts.
 ---
 
 # Publishing firmware a web flasher can fetch
 
-Verified against GitHub Actions, September 2026.
+Verified against GitHub Actions, October 2026.
 
 ## Why release assets do not work in a browser
 
-**GitHub serves release downloads with no `Access-Control-Allow-Origin` header** — on
-the `302` and on the redirect target — so a web page cannot fetch them at all. A
+**GitHub serves release downloads with no `Access-Control-Allow-Origin` header**, on
+the `302` and on the redirect target, so a web page cannot fetch them at all. A
 browser-based flasher (esptool-js, ESP Web Tools) pointed at a
 `github.com/.../releases/download/...` URL fails with a CORS error, not a 404, and no
 amount of client-side code fixes it.
@@ -32,7 +32,7 @@ Two consequences worth planning for:
 ## Size the branch deliberately
 
 The branch is force-pushed as one commit with no history, so a clone is one snapshot
-rather than the sum of every release — but it is still a branch everyone who clones the
+rather than the sum of every release. It is still a branch everyone who clones the
 repo may fetch. Firmware is large: two board variants × (15 MB merged + 4.5 MB OTA) is
 ~39 MB **per tag**. Keep the newest few and prune, and say in the branch's own README
 what the retention actually is. ("Holds only the current one" while the code keeps
@@ -52,7 +52,7 @@ stage_and_push() {
   git add -A
   git commit -q -m "firmware for $TAG"
   # Record BEFORE pushing: a run cancelled mid-push may have landed the commit,
-  # and any rollback needs this SHA. Recording one that never arrived is harmless —
+  # and any rollback needs this SHA. Recording one that never arrived is harmless:
   # the rollback's lease is then stale, so it is refused.
   git rev-parse HEAD > "$MARKER"
   if [ -n "${base:-}" ]; then
@@ -81,14 +81,14 @@ Cap the retries (three is plenty) and fail rather than loop.
 
 ### Re-stage through one function
 
-The retry must redo exactly what the first attempt did — copy the README, replace this
+The retry must redo exactly what the first attempt did: copy the README, replace this
 tag's directory, re-prune. Two copies of that logic drift the moment one is fixed, so
 make it one function called from both places.
 
 Two bugs that only appear on the *second* retry, both found by testing rather than
 reading:
 
-* `git reset --soft HEAD~1` fails on the first attempt — that commit has no parent.
+* `git reset --soft HEAD~1` fails on the first attempt, because that commit has no parent.
   Use `git checkout --orphan` instead; a wholesale-replacement push wants no history.
 * `git checkout --orphan fixed-name` fails the **second** time with
   `a branch named 'fixed-name' already exists`. Make the name unique per attempt.
@@ -100,20 +100,20 @@ the restore copies a file onto itself. Stage it outside the repo (`RUNNER_TEMP`)
 ## Rolling back without eating someone else's release
 
 If publishing the release assets fails *after* the mirror pushed, the branch advertises
-a tag whose release has none. Undoing that is right — but the undo must also be leased,
+a tag whose release has none. Undoing that is right, but the undo must also be leased,
 against the commit **this run** pushed. Otherwise a run that failed late will flatten a
 release that published after it.
 
 The trap is subtler than it looks: **re-take the snapshot every time you re-read the
 branch.** A single snapshot taken before the first attempt goes stale the moment a
 retry moves `base`, and then the rollback restores a state from before another run's
-tag existed — deleting their directory while their release still points at it.
+tag existed, deleting their directory while their release still points at it.
 Reproduced: the other tag's count went to 0. Verify the snapshot's HEAD equals `base`
 and discard it if not; restoring the wrong commit is worse than not restoring.
 
 Record "did the branch exist before this run" *before* anything that can fail. If a
 snapshot clone failure skips that write, a rollback that reads "no base" concludes the
-branch never existed and **deletes it** — turning a transient clone error into total
+branch never existed and **deletes it**, turning a transient clone error into total
 loss of the mirror.
 
 Two more, from testing:
@@ -134,20 +134,47 @@ concurrency:
   cancel-in-progress: false
 ```
 
-This serialises runs, and it is **not** a safety guarantee. GitHub keeps at most **one
-pending job per group**: publish three releases close together and the middle one is
-cancelled. That release attaches nothing, and it never reaches its own rollback step
-because its job never started — someone has to notice and re-run it by hand.
+This serialises runs, and on its own it is **not** a safety guarantee. By default
+GitHub keeps at most **one pending job per group**: publish three releases close
+together and the middle one is cancelled. That release attaches nothing, and it never
+reaches its own rollback step because its job never started. Someone has to notice and
+re-run it by hand. The same default let an hourly cron run cancel the registry's
+reindex that a release had just asked for.
 
-So treat the group as an optimisation and make the push safe by itself (the lease
-above). `cancel-in-progress` stays `false`: cancelling the *running* job mid-push is
-how the branch ends up holding neither release.
+Since May 2026 `concurrency` takes a `queue` key: `queue: max` keeps up to 100 runs
+waiting instead of cancelling all but one.
 
-Also: `concurrency` accepts only `group` and `cancel-in-progress`. There is no `queue`
-key — `actionlint` rejects it.
+```yaml
+concurrency:
+  group: mirror-${{ github.repository }}
+  queue: max
+  cancel-in-progress: false
+```
+
+actionlint 1.7.12 predates the key and reports `unexpected key "queue" for
+"concurrency" section`; GitHub accepts it. Silence it per file in
+`.github/actionlint.yaml` (`paths: <file>: ignore: [...]`) until actionlint knows it.
+
+Make the push safe by itself anyway (the lease above): a queue orders runs, it does not
+stop a manual re-run of an old tag racing a new one. `cancel-in-progress` stays
+`false`, because cancelling the *running* job mid-push is how the branch ends up
+holding neither release.
 
 ## Small things that cost real time
 
+* **`sort -V` puts a prerelease above its release.** It ranks `v1.2.0-rc1` after
+  `v1.2.0`, the opposite of semver. A script that closes "older" bump PRs with
+  `sort -V | tail -n1` keeps `v1.2.0-rc1`'s PR open once `v1.2.0` is out, and one that
+  picks the newest tag picks the rc. Compare the part before the `-` first
+  (`[ "${OLD%%-*}" = "$TAG" ]` means OLD is a prerelease of TAG), or use a real semver
+  comparison.
+* **A job without a checkout cannot `git push`.** A release job that only downloads
+  artifacts has no repository, so a rollback's `git push --delete "$remote" branch`
+  fails there and leaves a branch a failed first release created. Delete through the
+  API instead: `gh api -X DELETE repos/$REPO/git/refs/heads/<branch>`.
+* **Write generated files after the restore.** A README written into the work tree
+  before `git checkout FETCH_HEAD -- .` restores the branch is overwritten by the
+  previous run's copy, which names the previous tag.
 * **Guard the tag shape.** A tag becomes a directory name on the mirror branch. Reject
   `*/*`, `.`, `..` and leading `-` before touching the branch.
 * **Always keep the tag being published, regardless of pruning.** Re-publishing an old
@@ -159,7 +186,7 @@ key — `actionlint` rejects it.
   alike is how an auth error force-pushes an empty branch over every release's images.
 * **Keep stderr when a check fails.** `gh release view "$TAG" >/dev/null 2>&1` makes an
   expired token indistinguishable from a missing release, and "create the release first"
-  is misleading advice for the former. Capture with `e=$(cmd 2>&1 >/dev/null)` — easy to
+  is misleading advice for the former. Capture with `e=$(cmd 2>&1 >/dev/null)`, which is easy to
   write backwards.
 * **Test the real script, not a paraphrase.** Extract the step's `run:` block straight
   out of the YAML and drive it against a throwaway local `git init --bare`. Every bug
@@ -167,5 +194,5 @@ key — `actionlint` rejects it.
 
 ## Related
 
-`espos-registry-components` covers the other half of publishing — component checks that
+`espos-registry-components` covers the other half of publishing: component checks that
 keep working when a consumer installs from the ESP Component Registry.
