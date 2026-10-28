@@ -1,11 +1,11 @@
 ---
 name: espos-firmware-project
-description: Start, build, configure, test and maintain an ESP-IDF firmware on espOS — new-repo setup (secrets, Docker Hub login in CI, Dependabot, release App), the CMake prologue, sdkconfig layering, partition tables, the IDF version pin, the locked build wrapper, host tests, bumping the espos submodule and its dependencies.lock, gating a target on a minimum espOS, and releasing through espOS's reusable workflows.
+description: Start, build, configure, test and maintain an ESP-IDF firmware on espOS: new-repo setup (secrets, Docker Hub login in CI, Dependabot, the release App), the CMake prologue, sdkconfig layering, partition tables per flash size, the IDF version pin, the locked build wrapper and a warning gate, host tests, publishing live and dated Signal K data, bumping the espos submodule and its dependencies.lock, gating a target on a minimum espOS, and releasing through espOS's reusable workflows with GitHub-generated notes.
 ---
 
 # A firmware on espOS
 
-Verified against espOS v0.18.0 / ESP-IDF v6.0.3, October 2026. Primary sources in the
+Verified against espOS v0.24.0 / ESP-IDF v6.0.3, late October 2026. Primary sources in the
 espOS tree: `docs/development.md`, `docs/releasing.md`, `cmake/espos_project.cmake`,
 `cmake/espos_version.cmake`, `scripts/build.sh`.
 
@@ -15,7 +15,7 @@ Building outside the project? `espos-own-firmware` is the end-to-end order of wo
 (own key, following espOS releases, several boards, the registry, the README); this
 skill has the detail behind it.
 
-There is no template repository — espOS deleted `espos-template` because it rotted
+There is no template repository. espOS deleted `espos-template` because it rotted
 five releases behind. Start from an example CI builds on every release:
 `idf.py create-project-from-example "signalk-espos/espos_core:from_registry"` (registry
 consumer), or copy the gateway/cockpit layout for the submodule path below: add
@@ -29,20 +29,20 @@ never a branch tip), copy `espos/.idf-version` to the repo root, and build only 
 |---|---|---|
 | "Allow GitHub Actions to create and approve pull requests" | Settings → Actions → General | release-please and the espOS bump workflow open PRs; without it they fail with zero jobs |
 | signing key, e.g. `<NAME>_SIGNING_KEY_PEM` | **Secret** | release builds refuse to run without it; see `espos-keys-ota-fleet` |
-| `RELEASE_APP_ID`, `RELEASE_APP_PRIVATE_KEY` | **Secrets** | the org's release App token: its pushes and PRs start CI (the workflow token's do not) and it may send the registry's `firmware-released` dispatch |
+| `RELEASE_APP_ID`, `RELEASE_APP_PRIVATE_KEY` | **Secrets**, plus the App **installed on the repo** | the org's release App token: its pushes and PRs start CI (the workflow token's do not) and it may send the registry's `firmware-released` dispatch. The key alone gets a 404 from `create-github-app-token`; the NMEA gateway and bathy-bridge sat for days with no bump PR that way |
 | `DOCKERHUB_USERNAME` | **Variable**, the Docker ID | CI pulls the `espressif/idf` image; logged in, Docker Hub rate-limits per account instead of per shared runner IP. The step's `if:` tests it, since an `if:` cannot read a secret |
 | `DOCKERHUB_TOKEN` | **Secret** | the read-only access token for that account |
 
 The Docker Hub pair goes wrong in three quiet ways, all seen on a real repo:
 
 * **A token stored as an Actions *variable*.** `secrets.DOCKERHUB_TOKEN` then reads
-  empty, the login fails with `Password required`, and `continue-on-error` hides it —
+  empty, the login fails with `Password required`, and `continue-on-error` hides it.
   CI keeps pulling anonymously. Variables are plain text in the settings page and are
   not masked in logs: a token that sat in one should be rotated.
 * **The email instead of the Docker ID** as username. Logins with an access token want
   the Docker Hub username shown at the top of hub.docker.com.
 * **A personal password instead of a token.** Create one at hub.docker.com → Account
-  settings → Personal access tokens, scope **Public Repo Read-only** — CI only pulls.
+  settings → Personal access tokens, scope **Public Repo Read-only**, since CI only pulls.
 
 The login step, before every `espressif/esp-idf-ci-action` use, exactly as the gateway
 and cockpit run it:
@@ -51,7 +51,7 @@ and cockpit run it:
 - name: log in to Docker Hub
   if: vars.DOCKERHUB_USERNAME != ''
   continue-on-error: true   # a failed login falls back to an anonymous pull
-  uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+  uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
   with:
     username: ${{ vars.DOCKERHUB_USERNAME }}
     password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -60,8 +60,8 @@ and cockpit run it:
 Without the variable the step is skipped; forks and Dependabot PRs (which get no Actions
 secrets) fail the login and still build. A login in a caller does not reach a reusable
 workflow's jobs, so espOS's `build-firmware.yml` and `release-firmware.yml` take the two
-values as optional secrets and log in themselves (on `@main`, and in releases newer than
-v0.18.1; a pin to v0.18.1 or older rejects them as undeclared secrets). Pass them next to
+values as optional secrets and log in themselves (from v0.19.0; a pin to v0.18.1 or
+older rejects them as undeclared secrets). Pass them next to
 the signing key:
 
 ```yaml
@@ -90,7 +90,7 @@ updates:
 ### Gating a target on a minimum espOS
 
 When a target only works from some espOS release on (the ESP32-C5 BLE gateway needs
-espOS ≥ 0.18.0), refuse the build rather than trusting merge order — otherwise a
+espOS ≥ 0.18.0), refuse the build rather than trusting merge order. Otherwise a
 release cut before the submodule bump ships an image that boots and misbehaves:
 
 ```cmake
@@ -111,12 +111,12 @@ SHA. Root `CMakeLists.txt`:
 
 ```cmake
 cmake_minimum_required(VERSION 3.22)
-include("${CMAKE_CURRENT_LIST_DIR}/espos/cmake/espos_project.cmake")  # includes IDF's project.cmake — don't include both
+include("${CMAKE_CURRENT_LIST_DIR}/espos/cmake/espos_project.cmake")  # includes IDF's project.cmake; don't include both
 espos_project_prologue(NAME "my-firmware"
                        PARTITIONS "${ESPOS_PARTITIONS_DIR}/16mb.csv"
                        COMPONENTS espos_ble espos_eth)              # optional components
 project(my_firmware)          # this name is the registry "app" and the OTA project check
-espos_project_ui_partition()  # after project(), always — packs the web UI into storage.bin
+espos_project_ui_partition()  # after project(), always: also packs the web UI into storage.bin
 ```
 
 Prologue arguments: `NAME`, `PARTITIONS` (default 4 MB table), `COMPONENTS`,
@@ -128,19 +128,19 @@ defaults.
 **Optional components are excluded unless named in `COMPONENTS`:** `espos_ble espos_eth
 espos_n2k espos_nmea0183 espos_power espos_prov espos_sdlog espos_voice espos_audio
 espos_usb_storage` (the list in `cmake/espos_project.cmake`). `espos_start()` only starts
-what is in the build, so dropping one is silent — no BLE gateway, no Ethernet on a PoE P4.
+what is in the build, so dropping one is silent: no BLE gateway, no Ethernet on a PoE P4.
 A name that is not on the list fails configure; `espos_voice` brings `espos_audio` along.
 Also list them in `main/CMakeLists.txt` `PRIV_REQUIRES`. Installed from the registry,
 `REQUIRES` alone is enough.
 
 Added in 0.20.0:
 
-* `espos_nmea0183` — NMEA 0183 sentences off a UART, checksummed, decoded into Signal K
+* `espos_nmea0183`: NMEA 0183 sentences off a UART, checksummed, decoded into Signal K
   units and published (GPS, compass, depth). `docs/nmea0183.md`.
-* `espos_sdlog` — a microSD card over SDMMC or SPI and power-cut-safe sessions of rows,
+* `espos_sdlog`: a microSD card over SDMMC or SPI and power-cut-safe sessions of rows,
   each closed with a row count and sha256. The card's FatFs has no long file names, so
   every file name is 8.3. `docs/sdlog.md`.
-* `espos_usb_storage` — exports a microSD card over USB device mode to a chartplotter or
+* `espos_usb_storage`: exports a microSD card over USB device mode to a chartplotter or
   PC and follows the append-only files the host writes; espOS never writes to the card
   while it is exported. ESP32-P4 and ESP32-S3 only. `docs/usb-storage.md`.
 
@@ -163,27 +163,46 @@ short outage and ends on current values.
 
 A device that measures for **another vessel** (a dinghy reporting to the mothership's
 server) publishes with `espos_sk_publish_{number,string,bool,json}_ctx(context, ...)`,
-from the release after 0.20.0 (espOS #233). `espos_sk_vessel_context()` returns the
+from espOS 0.21.0 (#233). `espos_sk_vessel_context()` returns the
 device's own `vessels.urn:mrn:signalk:uuid:<uuid>`, generated once and kept in NVS
 (`skstate`/`vessel_id`, separate from the access-request client id), and the status JSON
 reports it as `vessel_context`. One batch holds up to four contexts and sends one delta
 per context. Never use an MMSI context for a vessel without its own AIS. Details in
 `docs/signalk.md`, "Delta stream".
 
+Three later additions, all in `docs/signalk.md`:
+
+* **A time of its own** (0.22.0, #236): `espos_sk_publish_*_ctx_at(context, path,
+  value, at_ms)` dates a value in unix milliseconds, for a sample held through a short
+  dropout or one the sensor stamped itself. A time before 2000 is refused, since it is
+  uptime or seconds passed by mistake. It does not make history replay safe: the
+  server still overwrites, and signalk-questdb and signalk-to-influxdb2 (by default)
+  stamp rows with their arrival time.
+* **Backpressure** (0.23.0, #238): `espos_sk_set_no_drop(true)` (or
+  `espos_sk_delta_cfg_t.no_drop`) makes a window-closing publish against a full ring
+  return `ESP_ERR_NO_MEM` instead of dropping the oldest message, so a caller can pace
+  itself. `espos_sk_delta_flush()` returns `esp_err_t` since then. It is backpressure,
+  not durability: nothing acknowledges a delta. Turn it off again for live values.
+* **Window size** (0.24.0, #243): `CONFIG_ESPOS_SK_PENDING_MAX` (default 32, range
+  4–32) caps the values one batching window holds. Each slot is about 370 bytes of one
+  allocation, so lower it on a board short of internal RAM.
+
 ## sdkconfig layering (later wins)
 
-1. `espos/sdkconfig.d/espos.defaults` (+ `.esp32`, `.esp32p4` — P4 file hard-wires the
-   Waveshare SDIO pins for the C6 co-processor; other P4 boards must override). From the
-   release after 0.20.0 it builds for size (`-Os`, espOS #234), which keeps the C5 and C6
-   images at ~82 % of the 4 MB table's slots; espOS CI fails an image over 90 %.
-2. `espos/sdkconfig.d/<profile>.defaults` — **`release` burns flash-encryption eFuses,
+1. `espos/sdkconfig.d/espos.defaults` (+ `.esp32`, `.esp32p4`; the P4 file hard-wires the
+   Waveshare SDIO pins for the C6 co-processor; other P4 boards must override). Since
+   0.21.0 it builds for size (`-Os`, espOS #234), about 12 % smaller than IDF's `-Og`,
+   which keeps the C5 and C6 images at ~82 % of the 4 MB table's slots; espOS CI fails an
+   image over 90 %. Images grow in 64 KB pages, so 1.3 KB of new code can be what
+   crosses the line.
+2. `espos/sdkconfig.d/<profile>.defaults`: **`release` burns flash-encryption eFuses,
    one-way.** `debug` adds heap poisoning, stack checks, debug logging, and builds with
-   `-Og` after 0.20.0 so a debugger sees the variables.
-3. project `sdkconfig.defaults` (+ `.<target>`) — only what differs from espOS
-4. `sdkconfig.local` — git-ignored bench overrides (board choice, local tweaks)
+   `-Og` (since 0.21.0) so a debugger sees the variables.
+3. project `sdkconfig.defaults` (+ `.<target>`): only what differs from espOS
+4. `sdkconfig.local`: git-ignored bench overrides (board choice, local tweaks)
 5. generated partition + flash-size fragment, then the signing fragment
 
-**Defaults reach a fresh `sdkconfig` only** — delete `build*/sdkconfig` after changing any
+**Defaults reach a fresh `sdkconfig` only.** Delete `build*/sdkconfig` after changing any
 of them. An explicit `-DSDKCONFIG_DEFAULTS=` replaces layers 1–4 (only the partition
 fragment survives), which silently drops `espos.defaults`; prologue projects pick variants
 through `sdkconfig.local` instead.
@@ -245,6 +264,12 @@ and a fatal error outside (escape: `-DESPOS_ALLOW_IDF_MISMATCH=1`). A consumer's
 minor: also `ESPOS_IDF_MAX_EXCL` and the manifests' range), and
 `tools/espos_registry_updates.py` with `dependency-drift.yml` covers registry components.
 
+espOS builds only on **tagged** IDF releases. As of late October 2026 v6.0.3 is the
+newest 6.0 tag; fixes sitting on `release/v6.0` (and Espressif's `release-v6.0` Docker
+image built from it) are untagged snapshots, so espOS waits for v6.0.4, which the drift
+check reports as an issue. v6.1 is out, but moving to it widens the `[6.0.0, 6.1.0)`
+range in every component and example and needs a full CI and size check.
+
 ## Building
 
 ```bash
@@ -257,8 +282,15 @@ espos/scripts/build.sh -B build-esp32p4 -p /dev/ttyACM0 flash monitor
 
 Always the wrapper, never bare `idf.py build`: one per-user lock for every espOS project
 on the machine, `nice`/`ionice`, half the cores (`BUILD_JOBS`), one job under 3 GB free,
-`BUILD_NOWAIT=1` to fail instead of queueing. Warnings are errors. CI needs
-`fetch-depth: 0` or `git describe` — and the reported version — breaks.
+`BUILD_NOWAIT=1` to fail instead of queueing. CI needs `fetch-depth: 0`, or
+`git describe` breaks and so does the version the device reports.
+
+Compiler warnings are errors (IDF 6 default), but CMake and linker warnings are not:
+`idf.py build` succeeds with them. For a zero-warnings rule, keep the log and gate on
+it, as `espos-bathy-bridge`'s `ci.yml` does: `set -o pipefail; idf.py build 2>&1 | tee
+build.log`, then fail on any `warning:` line or `CMake Warning` block except the
+expected "generating a development RSA-3072 signing key" (CMake wraps that text over
+several lines, so read each block with the lines after it).
 
 ## Testing
 
@@ -272,8 +304,11 @@ on the machine, `nice`/`ionice`, half the cores (`BUILD_JOBS`), one job under 3 
 * Web UI: `cd espOS/ui && npm ci && npm run dev` (mock server); `npm run build` rewrites
   the committed `components/espos_httpd/ui-dist/`, and CI fails on a stale bundle.
   `docs/rest-api.md` and `ui/mock/server.ts` change together. **A Dependabot bump of
-  the UI's npm dependencies fails CI the same way** — Dependabot edits only
-  `package.json` and the lock, so commit a rebuilt bundle on top of its PR.
+  the UI's npm dependencies fails CI the same way.** Dependabot edits only
+  `package.json` and the lock, so commit a rebuilt bundle on top of its PR. Since
+  espOS 0.17.3 the bundle is also built into the app image (`CONFIG_ESPOS_HTTPD_UI_EMBED`,
+  about 25 KiB) and served ahead of `storage`, so an OTA brings the matching page;
+  `GET /api/v1/system/info` → `ui` reports `embedded`, `storage` or `placeholder`.
 
 ## Bumping espOS in a firmware
 
@@ -297,8 +332,12 @@ git commit -am "chore: bump espos to vX.Y.Z"   # "chore!:" when espOS broke API
   regenerates `dependencies.lock` for it (the `release-lock` job does this in CI). A
   `chore(deps)` merge on espOS `main` can still leave the release branch's lock
   conflicting: merge `main` into the release branch, run `scripts/regen_lock.sh`,
-  commit — a manual release-please run does not help, as it leaves a branch whose notes
+  commit. A manual release-please run does not help, as it leaves a branch whose notes
   did not change alone.
+* The espOS release PR's lock check is red on release-please's first commit; that is
+  expected. Merge it only once the `release-lock` job has pushed the regenerated lock
+  and CI on that commit is green. Merging early left `main` red after 0.16.0, 0.17.0
+  and 0.22.0, each fixed by a separate `regen_lock.sh` PR.
 
 ## Releasing
 
@@ -316,12 +355,33 @@ permissions: { contents: write }
 
 Assets: `<name>-<board|target>-<tag>-{merged,ota}.bin`. A `builds` entry's
 `sdkconfig_defaults` is added to espOS's defaults (`ESPOS_EXTRA_SDKCONFIG_DEFAULTS`) from
-the first espOS release after v0.18.1; up to v0.18.1 it replaced them, signed-update
+v0.19.0; up to v0.18.1 it replaced them, signed-update
 settings included, so older pins select the board another way (`espos-own-firmware`). Today the gateway calls
 `build-firmware.yml@main` with its own mirror job and the cockpit builds fully inline;
 migrating either changes asset names, so update its registry regex in the same breath.
 Release repos need "Allow GitHub Actions to create pull requests" on, or release-please
 fails with zero jobs. Tags are plain `vX.Y.Z`; betas use the GitHub prerelease flag.
+
+Release-please settings every firmware repo needs:
+
+* **A first release at 0.1.0** needs `"initial-version": "0.1.0"` in the config.
+  `bump-minor-pre-major` alone still proposed 1.0.0 for the NMEA gateway, because no
+  earlier release existed.
+* **GitHub-generated notes**, as espOS and the newer firmware repos do: release-please
+  takes the notes GitHub generates (each PR's title, author and link), sorted by a
+  label that `label-by-title.yml` sets from the title's type (`.github/release.yml`:
+  `feat` → Added, `fix`/`revert` → Fixed, `perf`/`refactor` → Changed; `docs`,
+  `build`, `ci`, `test`, `chore` stay out). Its run is gated so that only a push with a
+  user-facing change (or the release PR's own merge) runs it; otherwise every docs
+  commit would propose a release. After changing the release configuration, run
+  release-please by hand. A PR from a fork is not labelled (read-only token).
+* **Squash-merge only**, the release PR included. A merge commit and the branch
+  commits under it are read as separate changes, which doubled the NMEA gateway's
+  0.2.0 notes and dropped the PR numbers.
+* `pr-title.yml` exempts bots from the 50-character subject limit (bathy-bridge #5:
+  `subjectPattern` picks `^(?![A-Z]).+$` when `github.event.pull_request.user.type` is
+  `Bot`). Dependabot names the package and both versions and cannot be told to
+  shorten them, so its PRs were red from the start.
 
 espOS itself releases the same way, then `publish.yml` uploads every component to the ESP
 Component Registry via OIDC (`gh workflow run publish.yml -f dry_run=true` to rehearse).
