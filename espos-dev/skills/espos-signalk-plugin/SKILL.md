@@ -32,6 +32,10 @@ What the server does with it (`plugins.ts`, `isEnabledByPackageEnableDefault`):
   are not applied (see below), so a plugin that reads `options.port` gets `undefined`.
 * It takes effect when the server starts after the install. The App Store asks for
   that restart anyway.
+* Adding the flag to a plugin already in use: an options file that has a
+  `configuration` but no `enabled` key gets that configuration replaced by `{}`. The
+  Admin UI always saves `enabled`, so this hits only hand-written options files; say
+  so in the release notes.
 
 Turn it on whenever `start({})` does something useful and harmless. The manager and
 the HMI designer do. Leave it off, and say why in the README, only when starting
@@ -93,7 +97,9 @@ moves, the sun is on the screen.
   `autocapitalize="off"` and `spellcheck="false"` for identifiers. A choice of a few options is a set of buttons or a select, not a
   text field.
 * **Fonts at 16 px or more** in inputs (smaller makes iOS zoom in on focus), and high
-  contrast. Follow `prefers-color-scheme` so the screen is dark at night.
+  contrast. Follow `prefers-color-scheme`, but that is the device's setting, not
+  the time of day: also offer a dark theme the user can pick, or follow Signal K's
+  `environment.mode` (night), which signalk-espos-manager publishes.
 * **Works at 360 px wide** with no horizontal scrolling; tables become lists on a
   narrow screen.
 * **Confirm destructive actions in the page**, not with `alert()` or `confirm()`,
