@@ -6,7 +6,7 @@ description: "Building a Signal K plugin or webapp for signalk-espOS (manager, H
 # Signal K plugins a boat owner never has to configure
 
 Verified against signalk-server 2.36.0 (Admin UI on `@rjsf/core` 5) and
-signalk-espos-manager 0.8.0, November 2026. Sources: signalk-server
+signalk-espos-manager 0.8.1, November 2026. Sources: signalk-server
 `src/interfaces/plugins.ts`, `docs/develop/plugins/configuration.md`,
 `docs/develop/webapps.md`; manager `package.json`, `src/config.ts`,
 `web/src/style.css`.
@@ -59,6 +59,10 @@ something to do) and enabling it.
   found. A Signal K plugin already runs inside the server, so never ask for the server
   URL or a token. An address field is the fallback for a network where mDNS does not
   pass, not the first thing the user sees.
+* **Never check an address by connecting to a device's data port.** The Zigbee
+  coordinator's 6638 and the stream capture server take one client, so a probe takes
+  the slot from Zigbee2MQTT or the panel. Use the mDNS record, or an HTTP health
+  endpoint where the device has one.
 * **Things that change a device stay opt-in.** A default may read, discover and show.
   Writing to a device, giving it a key or flashing it needs the user's click, or a
   setting that is off by default and says what it does (the manager's
@@ -82,16 +86,20 @@ moves, the sun is on the screen.
   button too. Pinch zoom stays on: keep `<meta name="viewport"
   content="width=device-width, initial-scale=1">` and never add `user-scalable=no`
   or `maximum-scale=1`.
-* **Inputs that fit the keyboard**: `type="number"` with `inputmode="decimal"` for
-  values, `type="url"` for addresses, `autocapitalize="off"` and `spellcheck="false"`
-  for identifiers. A choice of a few options is a set of buttons or a select, not a
+* **Inputs that fit the keyboard**: `type="number"` for values, plus
+  `inputmode="decimal"` only where a value cannot be negative (the iOS decimal pad has
+  no minus key). An address field takes a bare host, IP or `host:port`, which
+  `type="url"` refuses, so use `type="text"` with `inputmode="url"`. Add
+  `autocapitalize="off"` and `spellcheck="false"` for identifiers. A choice of a few options is a set of buttons or a select, not a
   text field.
 * **Fonts at 16 px or more** in inputs (smaller makes iOS zoom in on focus), and high
   contrast. Follow `prefers-color-scheme` so the screen is dark at night.
 * **Works at 360 px wide** with no horizontal scrolling; tables become lists on a
   narrow screen.
 * **Confirm destructive actions in the page**, not with `alert()` or `confirm()`,
-  which some kiosk browsers block and which are small on a plotter.
+  which some kiosk browsers block and which are small on a plotter. The manager
+  (fleet-key removal) and the HMI designer still call `window.confirm`; don't copy
+  that.
 
 ### The plugin config form
 

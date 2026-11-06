@@ -134,12 +134,10 @@ Signal K developer called the earlier ones machine-written. espOS's `CONTRIBUTIN
 
 ## Signal K plugin repos (manager, designer, stream, signalk-zigbee)
 
-Enabling by default, defaults that need no setup and touch-friendly webapps and config
-forms are in `espos-signalk-plugin`. Repo mechanics:
+Enabling by default, defaults that need no setup (`start()` gets `{}` until the user
+saves the config) and touch-friendly webapps and config forms are in
+`espos-signalk-plugin`. Repo mechanics:
 
-* Signal K does not apply the config schema's `default`s at runtime: `start()` gets `{}`
-  until the user saves the plugin config, so merge defaults (or parse the config) in
-  `start()` yourself.
 * The App Store installs plugins with `--ignore-scripts`; a dependency that needs an
   install script does not work there.
 * The App Store score comes from the Signal K plugin registry's nightly scan. It runs the

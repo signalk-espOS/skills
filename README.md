@@ -99,9 +99,8 @@ Signal K plugins and webapps a boat owner installs and never has to configure:
 `signalk-plugin-enabled-by-default` and what the server really does with it (starts the
 plugin with an empty configuration), merging defaults in `start()`, finding devices
 over mDNS instead of asking for addresses, keeping anything that changes a device
-opt-in, touch targets and inputs for a phone or plotter at the helm, and what a plugin
-can and cannot steer in the Admin UI's config form, or a `PluginConfigurationPanel`
-when the form is not enough.
+opt-in, touch targets and inputs for a phone or plotter at the helm, and how a plugin
+steers the Admin UI's config form, or replaces it with a `PluginConfigurationPanel`.
 
 ## Versions
 
