@@ -53,7 +53,7 @@ release's firmware, and `sort -V` ranking a prerelease above its release.
 
 ## espos-dev
 
-Four sibling skills for working on espOS itself and the projects built on it.
+Five sibling skills for working on espOS itself and the projects built on it.
 
 ### espos-ecosystem
 
@@ -92,6 +92,16 @@ manager generates, replaces and removes it; the device OTA flow and manifest; th
 radio co-processor update; listing a firmware in the registry and getting it indexed
 quickly; and how signalk-espos-manager takes a boat from first USB flash to staying
 current.
+
+### espos-signalk-plugin
+
+Signal K plugins and webapps a boat owner installs and never has to configure:
+`signalk-plugin-enabled-by-default` and what the server really does with it (starts the
+plugin with an empty configuration), merging defaults in `start()`, finding devices
+over mDNS instead of asking for addresses, keeping anything that changes a device
+opt-in, touch targets and inputs for a phone or plotter at the helm, and what a plugin
+can and cannot steer in the Admin UI's config form, or a `PluginConfigurationPanel`
+when the form is not enough.
 
 ## Versions
 
