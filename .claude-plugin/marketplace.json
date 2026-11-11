@@ -27,7 +27,7 @@
     {
       "name": "espos-dev",
       "source": "./espos-dev",
-      "description": "Working on espOS and its child repos, or building your own firmware on it: which repo owns what and the contracts between them, building, releasing and keeping a firmware current with espOS on several chips, boards and flash sizes, listing it in the registry, and signing keys, OTA, the P4 radio co-processor update and fleet-key management through signalk-espos-manager.",
+      "description": "Working on espOS and its child repos, or building your own firmware on it: which repo owns what and the contracts between them, building, releasing and keeping a firmware current with espOS on several chips, boards and flash sizes, listing it in the registry, signing keys, OTA, the P4 radio co-processor update and fleet-key management through signalk-espos-manager, and Signal K plugins that enable themselves, need no configuration and work on a touchscreen.",
       "author": {
         "name": "Dirk Wahrheit"
       },

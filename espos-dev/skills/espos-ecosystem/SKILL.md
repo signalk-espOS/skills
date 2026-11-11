@@ -134,9 +134,10 @@ Signal K developer called the earlier ones machine-written. espOS's `CONTRIBUTIN
 
 ## Signal K plugin repos (manager, designer, stream, signalk-zigbee)
 
-* Signal K does not apply the config schema's `default`s at runtime: `start()` gets `{}`
-  until the user saves the plugin config, so merge defaults (or parse the config) in
-  `start()` yourself.
+Enabling by default, defaults that need no setup (`start()` gets `{}` until the user
+saves the config) and touch-friendly webapps and config forms are in
+`espos-signalk-plugin`. Repo mechanics:
+
 * The App Store installs plugins with `--ignore-scripts`; a dependency that needs an
   install script does not work there.
 * The App Store score comes from the Signal K plugin registry's nightly scan. It runs the
@@ -172,4 +173,5 @@ Signal K developer called the earlier ones machine-written. espOS's `CONTRIBUTIN
 
 `espos-firmware-project` (building a firmware on espOS), `espos-own-firmware` (the path
 for an outside developer), `espos-keys-ota-fleet` (signing, OTA, the registry, the
-manager), and the generic ESP-IDF skills in `espos-firmware`.
+manager), `espos-signalk-plugin` (plugins and webapps a boat owner never has to
+configure), and the generic ESP-IDF skills in `espos-firmware`.
