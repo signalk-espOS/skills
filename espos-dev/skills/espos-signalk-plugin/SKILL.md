@@ -98,8 +98,10 @@ moves, the sun is on the screen.
   text field.
 * **Fonts at 16 px or more** in inputs (smaller makes iOS zoom in on focus), and high
   contrast. Follow `prefers-color-scheme`, but that is the device's setting, not
-  the time of day: also offer a dark theme the user can pick, or follow Signal K's
-  `environment.mode` (night), which signalk-espos-manager publishes.
+  the time of day. Always offer a dark theme the user can pick. Following Signal
+  K's `environment.mode` (night), which signalk-espos-manager publishes, comes on
+  top: the manager publishes no mode until the server has a position, so the
+  user's choice is the fallback.
 * **Works at 360 px wide** with no horizontal scrolling; tables become lists on a
   narrow screen.
 * **Confirm destructive actions in the page**, not with `alert()` or `confirm()`,
